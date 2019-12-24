@@ -12,6 +12,10 @@ from data import get_mnist_dataset
 from model import get_discriminator, get_encoder, get_generator
 from utils import get_grid, wasserstein_gradient_penalty
 
+GEN_PATH = "generator.ckpt"
+DISC_PATH = "discriminator.ckpt"
+ENC_PATH = "encoder.ckpt"
+
 
 @tf.function
 def _train_step(
@@ -214,22 +218,18 @@ def train_loop(
                             )
 
                 if global_step % save_steps == 0:
-                    generator.save_weights(
-                        os.path.join(save_dir, "generator.ckpt")
-                    )
+                    generator.save_weights(os.path.join(save_dir, GEN_PATH))
                     discriminator.save_weights(
-                        os.path.join(save_dir, "discriminator.ckpt")
+                        os.path.join(save_dir, DISC_PATH)
                     )
-                    encoder.save_weights(
-                        os.path.join(save_dir, "encoder.ckpt")
-                    )
+                    encoder.save_weights(os.path.join(save_dir, ENC_PATH))
 
                 global_step += 1
                 pbar.update()
 
-    generator.save_weights(os.path.join(save_dir, "generator.ckpt"))
-    discriminator.save_weights(os.path.join(save_dir, "discriminator.ckpt"))
-    encoder.save_weights(os.path.join(save_dir, "encoder.ckpt"))
+    generator.save_weights(os.path.join(save_dir, GEN_PATH))
+    discriminator.save_weights(os.path.join(save_dir, DISC_PATH))
+    encoder.save_weights(os.path.join(save_dir, ENC_PATH))
 
 
 def main(args):

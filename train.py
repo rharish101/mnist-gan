@@ -257,8 +257,8 @@ def main(args):
     enc_optim = tf.keras.optimizers.Adam(args.enc_lr, 0.5)
 
     # Save each run into a directory by its timestamp.
-    # Remove microseconds and convert to ISO 8601 YYYY-MM-DDThh:mm:ss format.
-    time_stamp = datetime.now().replace(microsecond=0).isoformat()
+    # Timestamp is in ISO 8601 YYYY-MM-DDThh:mm:ss format.
+    time_stamp = datetime.now().isoformat()
     log_dir = os.path.join(args.log_dir, time_stamp)
 
     if not os.path.exists(log_dir):

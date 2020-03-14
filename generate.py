@@ -7,7 +7,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from model import get_generator
-from train import GEN_PATH
+from train import BiGANTrainer
 
 
 def main(args):
@@ -19,7 +19,7 @@ def main(args):
 
     """
     generator = get_generator(args.noise_dims)
-    generator.load_weights(os.path.join(args.load_dir, GEN_PATH))
+    generator.load_weights(os.path.join(args.load_dir, BiGANTrainer.GEN_PATH))
 
     # Create the output directory if it doesn't exist
     if not os.path.exists(args.output_dir):

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Training a conditional BiGAN for MNIST."""
-import json
 import os
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from datetime import datetime
 
 import tensorflow as tf
+import yaml
 from tqdm import tqdm
 
 from data import get_mnist_dataset
@@ -15,6 +15,7 @@ from utils import get_grid, wasserstein_gradient_penalty
 GEN_PATH = "generator.ckpt"
 DISC_PATH = "discriminator.ckpt"
 ENC_PATH = "encoder.ckpt"
+CONFIG_YAML = "config.yaml"
 
 
 @tf.function
@@ -266,10 +267,9 @@ def main(args):
         os.makedirs(args.save_dir)
 
     # Save hyperparams in both log and save directories
-    with open(os.path.join(log_dir, "config.json"), "w") as conf:
-        json.dump(vars(args), conf)
-    with open(os.path.join(args.save_dir, "config.json"), "w") as conf:
-        json.dump(vars(args), conf)
+    for directory in log_dir, args.save_dir:
+        with open(os.path.join(directory, CONFIG_YAML), "w") as conf:
+            yaml.dump(vars(args), conf)
 
     writer = tf.summary.create_file_writer(log_dir)
 

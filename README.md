@@ -7,23 +7,30 @@ This requires Python 3.6+.
 
 All scripts use argparse to parse commandline arguments.
 For viewing the list of all positional and optional arguments for any script, type:
-```
+```sh
 ./script.py --help
 ```
 
 ### Setup
 1. Install all required Python libraries:
-```
-pip install -r requirements.txt
-```
-2. Download the MNIST dataset using the provided script (requires cURL >= 7.19.0):
-```
-./download_mnist.sh [/path/where/dataset/should/be/saved/]
-```
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+2. Install pre-commit hooks:
+    ```sh
+    pre-commit install
+    ```
+    **NOTE**: You need to be inside the virtual environment where you installed the dependencies.
+
+3. Download the MNIST dataset using the provided script (requires cURL >= 7.19.0):
+    ```sh
+    ./download_mnist.sh [/path/where/dataset/should/be/saved/]
+    ```
 
 ### Training
 Run `train.py`:
-```
+```sh
 ./train.py
 ```
 The trained model is saved in TensorFlow's ckpt format (to the directory given by the `--save-dir` argument).
@@ -31,7 +38,7 @@ The training logs are by default stored inside an ISO 8601 timestamp named subdi
 
 ### Generation
 Run `generate.py`:
-```
+```sh
 ./generate.py
 ```
 The generated images are saved in the directory given by the `--output-dir` argument.

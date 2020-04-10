@@ -1,5 +1,5 @@
-tensorflow>=2.1.0
-numpy>=1.17.2
-tqdm>=4.33.0
-PyYAML>=5.3
-pre-commit>=2.2.0
+tensorflow==2.1.0
+numpy==1.17.2
+tqdm==4.33.0
+PyYAML==5.3
+pre-commit==2.2.0

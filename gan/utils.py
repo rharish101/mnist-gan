@@ -1,5 +1,10 @@
 """Utilities for the MNIST GAN."""
+import itertools
+import os
+from datetime import datetime
+
 import tensorflow as tf
+import yaml
 
 
 def wasserstein_gradient_penalty(inputs, outputs, tape):
@@ -60,3 +65,35 @@ def get_grid(img):
     grid = tf.reshape(grid, (1, -1, grid.shape[2], img.shape[3]))
 
     return grid
+
+
+def setup_dirs(dirs, config, file_name, dirs_to_tstamp=[]):
+    """Create the required directories and dump the config there.
+
+    This supports creating timestamped directories in requested directories. It
+    creates a timestamped directory in each of those, and returns them.
+
+    Args:
+        dirs (list): The directories to be setup
+        config (dict): The config that is to be dumped
+        file_name (str): The file name for the config
+        dirs_to_tstamp (list): The directories for timestamping
+
+    Returns:
+        list: The list of created timestamped directories, if any
+
+    """
+    tstamped_dirs = []
+    for directory in dirs_to_tstamp:
+        time_stamp = datetime.now().isoformat()
+        new_dir = os.path.join(directory, time_stamp)
+        tstamped_dirs.append(new_dir)
+
+    # Save hyperparams in both log and save directories
+    for directory in itertools.chain(dirs, tstamped_dirs):
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(os.path.join(directory, file_name), "w") as conf:
+            yaml.dump(config, conf)
+
+    return tstamped_dirs

@@ -24,7 +24,7 @@ def main(args):
         os.makedirs(args.output_dir)
 
     helper = BiGANImgGenHelper(generator, noise_dims=args.noise_dims)
-    helper.generate(imgs_per_digit=args.imgs, output_dir=args.output_dir)
+    helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
 
 
 if __name__ == "__main__":
@@ -45,7 +45,13 @@ if __name__ == "__main__":
         help="dimensions of the generator noise vector",
     )
     parser.add_argument(
-        "--imgs",
+        "--batch-size",
+        type=int,
+        default=128,
+        help="the number of images in each batch of generation",
+    )
+    parser.add_argument(
+        "--imgs-per-digit",
         type=int,
         default=1,
         help="number of images to generate per digit",

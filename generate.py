@@ -19,10 +19,6 @@ def main(args):
     generator = get_generator(args.noise_dims)
     generator.load_weights(os.path.join(args.load_dir, BiGANTrainer.GEN_PATH))
 
-    # Create the output directory if it doesn't exist
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-
     helper = BiGANImgGenHelper(generator, noise_dims=args.noise_dims)
     helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
 

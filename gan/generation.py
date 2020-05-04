@@ -46,6 +46,9 @@ class BiGANImgGenHelper:
         """
         total_imgs = 10 * imgs_per_digit
 
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
         with tqdm(total=total_imgs, desc="Saving") as pbar:
             for start in range(0, total_imgs, batch_size):
                 end = min(total_imgs, start + batch_size)

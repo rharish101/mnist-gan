@@ -17,16 +17,23 @@ For viewing the list of all positional and optional arguments for any script, ty
     pip install -r requirements.txt
     ```
 
+2. Download the MNIST dataset using the provided script (requires cURL >= 7.19.0):
+    ```sh
+    ./download_mnist.sh [/path/where/dataset/should/be/saved/]
+    ```
+
+#### For Contributing
+1. Install extra dependencies for development (with Python 3.6+):
+    ```sh
+    pip install -r requirements-dev.txt
+    ```
+
 2. Install pre-commit hooks:
     ```sh
     pre-commit install
     ```
-    **NOTE**: You need to be inside the virtual environment where you installed the dependencies.
 
-3. Download the MNIST dataset using the provided script (requires cURL >= 7.19.0):
-    ```sh
-    ./download_mnist.sh [/path/where/dataset/should/be/saved/]
-    ```
+**NOTE**: You need to be inside the virtual environment where you installed the above dependencies every time you commit.
 
 ### Training
 Run `train.py`:

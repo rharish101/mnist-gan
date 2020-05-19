@@ -2,26 +2,28 @@
 import itertools
 import os
 from datetime import datetime
+from typing import Any, Dict, List
 
 import tensorflow as tf
 import yaml
+from tensorflow import GradientTape, Tensor
 
 
-def wasserstein_gradient_penalty(inputs, outputs, tape):
+def wasserstein_gradient_penalty(
+    inputs: Tensor, outputs: Tensor, tape: GradientTape
+) -> Tensor:
     """Return the Wasserstein Gradient Penalty loss.
 
     The original paper can be found at: https://arxiv.org/abs/1704.00028
 
     Args:
-        inputs (`tf.Tensor`): The inputs for the generator
-        outputs (`tf.Tensor`): The discriminator's outputs for the images
-            generated from the above inputs
-        tape (`tf.GradientTape`): The persistent gradient tape for calculating
-            gradients
+        inputs: The inputs for the generator
+        outputs: The discriminator's outputs for the images generated from the
+            above inputs
+        tape: The persistent gradient tape for calculating gradients
 
     Returns:
-        float: The gradient penalty loss
-
+        The gradient penalty loss
     """
     grads = tape.gradient(outputs, inputs)
     norm = tf.sqrt(tf.reduce_sum(grads ** 2, axis=1))
@@ -30,7 +32,7 @@ def wasserstein_gradient_penalty(inputs, outputs, tape):
 
 
 @tf.function
-def get_grid(img):
+def get_grid(img: Tensor) -> Tensor:
     """Convert a batch of float images from [-1, 1] to a uint8 image grid.
 
     The returned image will contain a batch size of 1.
@@ -67,21 +69,25 @@ def get_grid(img):
     return grid
 
 
-def setup_dirs(dirs, config, file_name, dirs_to_tstamp=[]):
+def setup_dirs(
+    dirs: List[str],
+    config: Dict[str, Any],
+    file_name: str,
+    dirs_to_tstamp: List[str] = [],
+) -> List[str]:
     """Create the required directories and dump the config there.
 
     This supports creating timestamped directories in requested directories. It
     creates a timestamped directory in each of those, and returns them.
 
     Args:
-        dirs (list): The directories to be setup
-        config (dict): The config that is to be dumped
-        file_name (str): The file name for the config
-        dirs_to_tstamp (list): The directories for timestamping
+        dirs: The directories to be setup
+        config: The config that is to be dumped
+        file_name: The file name for the config
+        dirs_to_tstamp: The directories for timestamping
 
     Returns:
-        list: The list of created timestamped directories, if any
-
+        The list of created timestamped directories, if any
     """
     tstamped_dirs = []
     for directory in dirs_to_tstamp:

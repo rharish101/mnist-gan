@@ -1,9 +1,14 @@
 """Class for training the GAN."""
 import os
+from typing import Dict, Tuple
 
 import tensorflow as tf
+from tensorflow import Tensor
+from tensorflow.data import Dataset
+from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
+from typing_extensions import Final
 
 from .utils import get_grid, wasserstein_gradient_penalty
 
@@ -11,41 +16,38 @@ from .utils import get_grid, wasserstein_gradient_penalty
 class BiGANTrainer:
     """Class to train an MNIST BiGAN."""
 
-    GEN_PATH = "generator.ckpt"
-    DISC_PATH = "discriminator.ckpt"
-    ENC_PATH = "encoder.ckpt"
+    GEN_PATH: Final[str] = "generator.ckpt"
+    DISC_PATH: Final[str] = "discriminator.ckpt"
+    ENC_PATH: Final[str] = "encoder.ckpt"
 
     def __init__(
         self,
-        generator,
-        discriminator,
-        encoder,
-        noise_dims,
-        gen_lr,
-        disc_lr,
-        enc_lr,
-        gp_weight,
-        cl_weight,
-        log_dir,
-        save_dir,
-    ):
+        generator: Model,
+        discriminator: Model,
+        encoder: Model,
+        noise_dims: int,
+        gen_lr: float,
+        disc_lr: float,
+        enc_lr: float,
+        gp_weight: float,
+        cl_weight: float,
+        log_dir: str,
+        save_dir: str,
+    ) -> None:
         """Store main models and info required for training.
 
         Args:
-            generator (`tf.keras.Model`): The generator model to be trained
-            discriminator (`tf.keras.Model`): The discriminator model to be
-                trained
-            encoder (`tf.keras.Model`): The encoder model to be trained
-            noise_dims (int): The dimensions for the inputs to the generator
-            gen_lr (float): The learning rate for the generator's optimizer
-            disc_lr (float): The learning rate for the discriminator's
-                optimizer
-            enc_lr (float): The learning rate for the encoder's optimizer
-            gp_weight (float): Weights for the discriminator's gradient penalty
-            cl_weight (float): Weights for the encoder's classification loss
-            log_dir (str): Directory where to write event logs
-            save_dir (str): Directory where to store model weights
-
+            generator: The generator model to be trained
+            discriminator: The discriminator model to be trained
+            encoder: The encoder model to be trained
+            noise_dims: The dimensions for the inputs to the generator
+            gen_lr: The learning rate for the generator's optimizer
+            disc_lr: The learning rate for the discriminator's optimizer
+            enc_lr: The learning rate for the encoder's optimizer
+            gp_weight: Weights for the discriminator's gradient penalty
+            cl_weight: Weights for the encoder's classification loss
+            log_dir: Directory where to write event logs
+            save_dir: Directory where to store model weights
         """
         self.generator = generator
         self.discriminator = discriminator
@@ -64,21 +66,22 @@ class BiGANTrainer:
         self.save_dir = save_dir
 
     @tf.function
-    def train_step(self, real, labels):
+    def train_step(
+        self, real: Tensor, labels: Tensor
+    ) -> Tuple[Tensor, Tensor, Tensor, Dict[str, Tensor]]:
         """Run a single training step.
 
         The returned dict of losses are used for logging summaries.
 
         Args:
-            real (`tf.Tensor`): The input real images
-            labels (`tf.Tensor`): The corresponding input labels
+            real: The input real images
+            labels: The corresponding input labels
 
         Returns:
-            `tf.Tensor`: The generated images
-            `tf.Tensor`: The predicted latent vectors for the real images
-            `tf.Tensor`: The predicted labels for the real images
+            The generated images
+            The predicted latent vectors for the real images
+            The predicted labels for the real images
             dict: The dictionary of losses, as required by `log_summaries`
-
         """
         noise = tf.random.normal((real.get_shape()[0], self.noise_dims))
 
@@ -161,8 +164,14 @@ class BiGANTrainer:
         return generated, pred_noise, pred_labels, losses
 
     def log_summaries(
-        self, real, generated, pred_noise, pred_labels, losses, global_step
-    ):
+        self,
+        real: Tensor,
+        generated: Tensor,
+        pred_noise: Tensor,
+        pred_labels: Tensor,
+        losses: Dict[str, Tensor],
+        global_step: int,
+    ) -> None:
         """Log summaries to disk.
 
         The dict of losses should have the following key-value pairs:
@@ -174,14 +183,12 @@ class BiGANTrainer:
             enc_reg: The L2 regularization loss for the encoder
 
         Args:
-            real (`tf.Tensor`): The input real images
-            generated (`tf.Tensor`): The generated images
-            pred_noise (`tf.Tensor`): The predicted latent vectors for the real
-                images
-            pred_labels (`tf.Tensor`): The predicted labels for the real images
-            losses (dict): The dictionary of losses
-            global_step (int): The current global training step
-
+            real: The input real images
+            generated: The generated images
+            pred_noise: The predicted latent vectors for the real images
+            pred_labels: The predicted labels for the real images
+            losses: The dictionary of losses
+            global_step: The current global training step
         """
         with self.writer.as_default():
             with tf.name_scope("losses"):
@@ -223,7 +230,7 @@ class BiGANTrainer:
                     "reconstructed", recons_grid, step=global_step,
                 )
 
-    def save_models(self):
+    def save_models(self) -> None:
         """Save the models to disk."""
         self.generator.save_weights(os.path.join(self.save_dir, self.GEN_PATH))
         self.discriminator.save_weights(
@@ -231,30 +238,41 @@ class BiGANTrainer:
         )
         self.encoder.save_weights(os.path.join(self.save_dir, self.ENC_PATH))
 
-    def train(self, dataset, epochs, record_steps, save_steps):
+    def train(
+        self, dataset: Dataset, epochs: int, record_steps: int, save_steps: int
+    ) -> None:
         """Execute the training loops for the BiGAN.
 
         Args:
-            dataset (`tf.data.Dataset`): The dataset of real images
-            epochs (int): Number of epochs to train the GAN
-            record_steps (int): Step interval for recording summaries
-            save_steps (int): Step interval for saving the model
-
+            dataset: The dataset of real images
+            epochs: Number of epochs to train the GAN
+            record_steps: Step interval for recording summaries
+            save_steps: Step interval for saving the model
         """
         # Total no. of batches in the dataset
         total_steps = tf.data.experimental.cardinality(dataset).numpy()
 
         # Global step is used for saving summaries.
-        global_step = 1
+        global_step: int = 1
 
         with tqdm(total=epochs * total_steps, desc="Training") as pbar:
             for _ in range(epochs):
                 for real, labels in dataset:
-                    items_to_log = self.train_step(real, labels)
+                    (
+                        generated,
+                        pred_noise,
+                        pred_labels,
+                        losses,
+                    ) = self.train_step(real, labels)
 
                     if global_step % record_steps == 0:
                         self.log_summaries(
-                            real, *items_to_log, global_step,
+                            real,
+                            generated,
+                            pred_noise,
+                            pred_labels,
+                            losses,
+                            global_step,
                         )
 
                     if global_step % save_steps == 0:

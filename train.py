@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Training a conditional BiGAN for MNIST."""
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+
+from typing_extensions import Final
 
 from gan.data import get_mnist_dataset
 from gan.models import get_discriminator, get_encoder, get_generator
 from gan.training import BiGANTrainer
 from gan.utils import setup_dirs
 
-CONFIG_YAML = "config.yaml"
+CONFIG_YAML: Final[str] = "config.yaml"
 
 
-def main(args):
+def main(args: Namespace) -> None:
     """Run the main program.
 
     Arguments:
-        args (`argparse.Namespace`): The object containing the commandline
-            arguments
-
+        args: The object containing the commandline arguments
     """
     dataset = get_mnist_dataset(args.mnist_path, args.batch_size)
     image_shape = dataset.element_spec[0].shape.as_list()[1:]

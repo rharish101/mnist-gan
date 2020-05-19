@@ -1,5 +1,8 @@
 """Generator, discriminator and encoder network models for MNIST."""
+from typing import Tuple, Type, Union
+
 import tensorflow as tf
+from tensorflow import Tensor, TensorShape, Variable
 from tensorflow.keras import Input, Model
 from tensorflow.keras.initializers import RandomNormal
 from tensorflow.keras.layers import (
@@ -16,15 +19,18 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.regularizers import l2
 
+# The type of an input shape spec for a Keras layer
+Shape = Union[Tuple[int, ...], TensorShape]
 
-def spectralize(layer):  # noqa: D202
+
+def spectralize(layer: Type[Layer]) -> Type[Layer]:  # noqa: D202
     """Return a class with spectral normalization over the kernel.
 
     This will require that the given layer should have a "kernel" attribute.
     """
 
-    class SpectralLayer(layer):
-        def build(self, input_shape):
+    class SpectralLayer(layer):  # type: ignore
+        def build(self, input_shape: Shape) -> None:
             """Initialize the vector for the power iteration method."""
             super().build(input_shape)
             # For Conv kernels, the last layer will be the output channels.
@@ -39,7 +45,9 @@ def spectralize(layer):  # noqa: D202
             )
 
         @tf.function
-        def _spectral_norm(self, weights, training=False):
+        def _spectral_norm(
+            self, weights: Variable, training: bool = False
+        ) -> Tensor:
             # For Conv kernels, the last layer will be the output channels.
             # Therefore, (H, W, C_in, C_out) -> (H * W * C_in, C_out)
             w = tf.reshape(weights, (-1, weights.shape[-1]))
@@ -53,7 +61,7 @@ def spectralize(layer):  # noqa: D202
             spec_norm = tf.matmul(tf.matmul(tf.transpose(u), w), v)
             return spec_norm
 
-        def call(self, inputs, training=False):
+        def call(self, inputs: Tensor, training: bool = False) -> Tensor:
             """Perform spectral normalization before calling the layer."""
             spec_norm = self._spectral_norm(self.kernel, training=training)
             self.kernel.assign(self.kernel / spec_norm)
@@ -70,26 +78,26 @@ class Conditioning(Layer):
     dense layer as the no. of classes is smaller than typical embedding sizes.
     """
 
-    def __init__(self, weight_decay):
+    def __init__(self, weight_decay: float) -> None:
         """Store weight decay."""
         super().__init__()
         self.weight_decay = weight_decay
 
-    def build(self, input_shape):
+    def build(self, input_shape: Tuple[Shape, Shape, Shape]) -> None:
         """Initialize the Conv2DTranspose and Embedding layers."""
         tensor_shape, noise_shape, _ = input_shape
 
         noise_new_shape = [noise_shape[0], 1, 1, noise_shape[1]]
         self.conv_t = Conv2DTranspose(
             tensor_shape[-1],
-            tensor_shape[1:-1],
+            tensor_shape[1:3],
             strides=1,
             use_bias=False,
             kernel_regularizer=l2(self.weight_decay),
             input_shape=noise_new_shape,
         )
 
-        flat_dim = tensor_shape[1:].num_elements()
+        flat_dim = tensor_shape[1] * tensor_shape[2] * tensor_shape[3]
         self.embed = Embedding(
             10,
             flat_dim,
@@ -101,38 +109,36 @@ class Conditioning(Layer):
         self.conv_t.build(noise_new_shape)
         self.kernel = self.conv_t.kernel
 
-    def call(self, inputs):
+    def call(self, inputs: Tuple[Tensor, Tensor, Tensor]) -> Tensor:
         """Condition the tensor from the noise and label vectors.
 
         Args:
-            inputs (tuple): A tuple of two tensors, where the first is the
-                tensor to be conditioned, the second is the noise, and the
-                third is the labels
+            inputs: A tuple of three tensors:
+                * The tensor to be conditioned
+                * The noise
+                * The labels
 
         Returns:
-            `tf.Tensor`: The conditioned tensor
+            The conditioned tensor
 
         """
         tensor, noise, labels = inputs
         reshaped = tf.reshape(noise, [-1, 1, 1, noise.shape[1]])
         noise_cond = self.conv_t(reshaped)
         embeddings = self.embed(labels)
-        labels_cond = tf.reshape(
-            embeddings, [-1, tensor.shape[1], tensor.shape[2], tensor.shape[3]]
-        )
+        labels_cond = tf.reshape(embeddings, [-1, *tensor.shape[1:]])
         return tensor + noise_cond + labels_cond
 
 
-def get_generator(noise_dims, weight_decay=2.5e-5):
+def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
     """Return the generator model.
 
     Args:
-        noise_dims (float): The dimensions of the input to the generator
-        weight_decay (float): The decay for L2 regularization
+        noise_dims: The dimensions of the input to the generator
+        weight_decay: The decay for L2 regularization
 
     Returns:
-        `tf.keras.Model`: The generator model
-
+        The generator model
     """
     noise = Input(shape=[noise_dims])
     labels = Input(shape=[])
@@ -143,7 +149,9 @@ def get_generator(noise_dims, weight_decay=2.5e-5):
     x = Concatenate(axis=-1)([noise, cond])
     x = Reshape([1, 1, noise_dims + cond.shape[-1]])(x)
 
-    def conv_t_block(inputs, filters, first=False):
+    def conv_t_block(
+        inputs: Tensor, filters: int, first: bool = False
+    ) -> Tensor:
         x = Conv2DTranspose(
             filters,
             4,
@@ -174,18 +182,21 @@ def get_generator(noise_dims, weight_decay=2.5e-5):
     return Model(inputs=[noise, labels], outputs=outputs)
 
 
-def get_discriminator(input_shape, noise_dims, weight_decay=2.5e-5):
+def get_discriminator(
+    input_shape: Tuple[int, int, int],
+    noise_dims: int,
+    weight_decay: float = 2.5e-5,
+) -> Model:
     """Return the discriminator model.
 
     Args:
-        input_shape (tuple): The shape of the input to the discriminator
-            excluding the batch size
-        noise_dims (float): The dimensions of the input to the generator
-        weight_decay (float): The decay for L2 regularization
+        input_shape: The shape of the input to the discriminator excluding the
+            batch size
+        noise_dims: The dimensions of the input to the generator
+        weight_decay: The decay for L2 regularization
 
     Returns:
-        `tf.keras.Model`: The discriminator model
-
+        The discriminator model
     """
     SpectralConv2D = spectralize(Conv2D)
     SpectralConditioning = spectralize(Conditioning)
@@ -194,7 +205,7 @@ def get_discriminator(input_shape, noise_dims, weight_decay=2.5e-5):
     noise = Input(shape=[noise_dims])
     labels = Input(shape=[])
 
-    def conv_block(inputs, filters, norm=True):
+    def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
         x = SpectralConv2D(
             filters,
             4,
@@ -227,22 +238,25 @@ def get_discriminator(input_shape, noise_dims, weight_decay=2.5e-5):
     return Model(inputs=[inputs, noise, labels], outputs=outputs)
 
 
-def get_encoder(input_shape, noise_dims, weight_decay=2.5e-5):
+def get_encoder(
+    input_shape: Tuple[int, int, int],
+    noise_dims: int,
+    weight_decay: float = 2.5e-5,
+) -> Model:
     """Return the encoder model.
 
     Args:
-        input_shape (tuple): The shape of the input to the encoder excluding
+        input_shape: The shape of the input to the encoder excluding
             the batch size
-        noise_dims (float): The dimensions of the input to the generator model
-        weight_decay (float): The decay for L2 regularization
+        noise_dims: The dimensions of the input to the generator model
+        weight_decay: The decay for L2 regularization
 
     Returns:
-        `tf.keras.Model`: The encoder model
-
+        The encoder model
     """
     inputs = Input(shape=input_shape)
 
-    def conv_block(inputs, filters, norm=True):
+    def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
         x = Conv2D(
             filters,
             4,

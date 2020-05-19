@@ -1,11 +1,12 @@
 """Data loading utilities for the MNIST GAN."""
 import os
+from typing import BinaryIO, Dict, List, Tuple
 
 import numpy as np
 import tensorflow as tf
 
 
-def _load_idx(idx):
+def _load_idx(idx: BinaryIO) -> np.ndarray:
     """Load an IDX file object opened in 'rb' mode."""
     idx.read(2)  # Skip the zero bytes
 
@@ -26,7 +27,7 @@ def _load_idx(idx):
 
     # Get the tensor's dimensions
     num_dims = int(idx.read(1).hex(), 16)
-    shape = []
+    shape: List[int] = []
     for i in range(num_dims):
         dim_len = int(idx.read(4).hex(), 16)
         shape.append(dim_len)
@@ -42,27 +43,26 @@ def _load_idx(idx):
     return np.reshape(image, shape, order="C")
 
 
-def load_dataset(mnist_path):
+def load_dataset(mnist_path: str) -> Tuple[np.ndarray, np.ndarray]:
     """Load the MNIST IDX image files and return numpy arrays.
 
     The images are grayscale uint8 images, of shape (images, width, height).
     The labels are integers from 0 to 9, of shape (labels,).
 
     Args:
-        mnist_path (str): Path to the MNIST dataset
+        mnist_path: Path to the MNIST dataset
 
     Returns:
-        `np.ndarray`: A 4D array of all uint8 28x28 grayscale MNIST images
-        `np.ndarray`: A 1D array of all uint8 MNIST labels
-
+        A 4D array of all uint8 28x28 grayscale MNIST images
+        A 1D array of all uint8 MNIST labels
     """
     # Expand "~"
     mnist_path = os.path.expanduser(mnist_path)
-    dataset = {"train": {}, "test": {}}
+    dataset: Dict[str, Dict[str, np.ndarray]] = {"train": {}, "test": {}}
 
     # Prefixes and infixes for generating filenames
-    prefixes = {"train": "train", "test": "t10k"}
-    infixes = {"images": "3", "labels": "1"}
+    prefixes: Dict[str, str] = {"train": "train", "test": "t10k"}
+    infixes: Dict[str, str] = {"images": "3", "labels": "1"}
     for mode in prefixes:
         for data in infixes:
             filename = f"{prefixes[mode]}-{data}-idx{infixes[data]}-ubyte"
@@ -88,7 +88,7 @@ def load_dataset(mnist_path):
 
 
 @tf.function
-def preprocess(img, lbl):
+def preprocess(img: tf.Tensor, lbl: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
     """Preprocess a raw MNIST image and its label.
 
     This converts a 2D 28x28 tensor in the range [0, 255] into a float32 3D
@@ -103,16 +103,15 @@ def preprocess(img, lbl):
     return img, lbl
 
 
-def get_mnist_dataset(mnist_path, batch_size):
+def get_mnist_dataset(mnist_path: str, batch_size: int) -> tf.data.Dataset:
     """Get a dataset object for the MNIST dataset.
 
     Args:
-        mnist_path (str): Path to the MNIST dataset
-        batch_size (int): The batch size
+        mnist_path: Path to the MNIST dataset
+        batch_size: The batch size
 
     Returns:
-        `tensorflow.data.Dataset`: The dataset object
-
+        The dataset object
     """
     mnist_images, mnist_labels = load_dataset(mnist_path)
     dataset = tf.data.Dataset.from_tensor_slices((mnist_images, mnist_labels))

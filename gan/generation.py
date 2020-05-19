@@ -2,25 +2,25 @@
 import os
 
 import tensorflow as tf
+from tensorflow.keras import Model
 from tqdm import tqdm
 
 
 class BiGANImgGenHelper:
     """Class to generate images using an MNIST BiGAN."""
 
-    def __init__(self, generator, noise_dims):
+    def __init__(self, generator: Model, noise_dims: int) -> None:
         """Store the required objects and info.
 
         Args:
-            generator (`tf.keras.Model`): The generator model to be trained
-            noise_dims (int): The dimensions for the inputs to the generator
-
+            generator: The generator model to be trained
+            noise_dims: The dimensions for the inputs to the generator
         """
         self.generator = generator
         self.noise_dims = noise_dims
 
     @tf.function
-    def _gen_img(self, digits):
+    def _gen_img(self, digits: tf.Tensor) -> tf.Tensor:
         """Generate images of the requested digits."""
         noise = tf.random.normal([digits.shape[0], self.noise_dims])
         label = tf.convert_to_tensor(digits)
@@ -35,14 +35,15 @@ class BiGANImgGenHelper:
         with tf.device("/cpu:0"):
             return tf.map_fn(tf.io.encode_jpeg, outputs, dtype=tf.string)
 
-    def generate(self, imgs_per_digit, batch_size, output_dir):
+    def generate(
+        self, imgs_per_digit: int, batch_size: int, output_dir: str
+    ) -> None:
         """Generate the digits and save them to disk.
 
         Args:
-            total_imgs (int): The total number of images to generate
-            batch_size (int): The number of images in each batch of generation
-            output_dir (str): Where to save the generated images
-
+            imgs_per_digit: The total number of images to generate per digit
+            batch_size: The number of images in each batch of generation
+            output_dir: Where to save the generated images
         """
         total_imgs = 10 * imgs_per_digit
 

@@ -1,35 +1,38 @@
 """Data loading utilities for the MNIST GAN."""
 import os
-from typing import BinaryIO, Dict, List, Tuple
+from typing import BinaryIO, Dict, List, Tuple, Type
 
 import numpy as np
 import tensorflow as tf
+from typing_extensions import Final
+
+# Map the size as found in IDX files to their respective numpy dtypes
+SIZE_TO_DTYPE: Final[Dict[int, Type[np.number]]] = {
+    8: np.uint8,
+    9: np.int8,
+    11: np.int16,
+    12: np.int32,
+    13: np.float32,
+    14: np.float64,
+}
 
 
 def _load_idx(idx: BinaryIO) -> np.ndarray:
-    """Load an IDX file object opened in 'rb' mode."""
-    idx.read(2)  # Skip the zero bytes
+    """Load an IDX file object opened in 'rb' mode.
+
+    The IDX specification is available at: http://yann.lecun.com/exdb/mnist/
+    """
+    idx.seek(2, 0)  # skip the first zero bytes
 
     # Get the dtype of the tensor
-    dtype_byte = int(idx.read(1).hex(), 16)
-    if dtype_byte == 8:
-        dtype = np.uint8
-    elif dtype_byte == 9:
-        dtype = np.int8
-    elif dtype_byte == 11:
-        dtype = np.int16
-    elif dtype_byte == 12:
-        dtype = np.int32
-    elif dtype_byte == 13:
-        dtype = np.float32
-    elif dtype_byte == 14:
-        dtype = np.float64
+    dtype_size = int.from_bytes(idx.read(1), "big")
+    dtype = SIZE_TO_DTYPE[dtype_size]
 
     # Get the tensor's dimensions
-    num_dims = int(idx.read(1).hex(), 16)
+    num_dims = int.from_bytes(idx.read(1), "big")
     shape: List[int] = []
     for i in range(num_dims):
-        dim_len = int(idx.read(4).hex(), 16)
+        dim_len = int.from_bytes(idx.read(4), "big")
         shape.append(dim_len)
 
     # Row major form
@@ -37,7 +40,7 @@ def _load_idx(idx: BinaryIO) -> np.ndarray:
     dtype_size = dtype().nbytes
     image = np.empty(total_length, dtype=dtype)
     for i in range(total_length):
-        image[i] = int(idx.read(dtype_size).hex(), 16)
+        image[i] = int.from_bytes(idx.read(dtype_size), "big")
 
     # Original form
     return np.reshape(image, shape, order="C")

@@ -1,4 +1,5 @@
 """Class for training the GAN."""
+import itertools
 import os
 from typing import Dict, Tuple
 
@@ -250,35 +251,24 @@ class BiGANTrainer:
             save_steps: Step interval for saving the model
         """
         # Total no. of batches in the dataset
-        total_steps = tf.data.experimental.cardinality(dataset).numpy()
+        dataset_size = tf.data.experimental.cardinality(dataset).numpy()
 
-        # Global step is used for saving summaries.
-        global_step: int = 1
+        # Iterate over dataset in epochs
+        data_in_epochs = itertools.product(range(epochs), dataset)
 
-        with tqdm(total=epochs * total_steps, desc="Training") as pbar:
-            for _ in range(epochs):
-                for real, labels in dataset:
-                    (
-                        generated,
-                        pred_noise,
-                        pred_labels,
-                        losses,
-                    ) = self.train_step(real, labels)
+        for global_step, (_, (real, lbls)) in tqdm(
+            enumerate(data_in_epochs, 1),
+            total=epochs * dataset_size,
+            desc="Training",
+        ):
+            gen, pred_noise, pred_lbls, losses = self.train_step(real, lbls)
 
-                    if global_step % record_steps == 0:
-                        self.log_summaries(
-                            real,
-                            generated,
-                            pred_noise,
-                            pred_labels,
-                            losses,
-                            global_step,
-                        )
+            if global_step % record_steps == 0:
+                self.log_summaries(
+                    real, gen, pred_noise, pred_lbls, losses, global_step,
+                )
 
-                    if global_step % save_steps == 0:
-                        self.save_models()
-
-                    global_step += 1
-                    pbar.update()
+            if global_step % save_steps == 0:
+                self.save_models()
 
         self.save_models()

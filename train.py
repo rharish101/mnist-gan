@@ -4,12 +4,17 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
 from typing_extensions import Final
 
-from gan.data import get_mnist_dataset
-from gan.models import get_discriminator, get_encoder, get_generator
-from gan.training import BiGANTrainer
+from gan.data import NUM_CLS, get_mnist_dataset
+from gan.models import (
+    Classifier,
+    get_discriminator,
+    get_encoder,
+    get_generator,
+)
+from gan.training import BiGANTrainer, ClassifierTrainer
 from gan.utils import setup_dirs
 
-CONFIG: Final[str] = "config.yaml"
+CONFIG: Final[str] = "config-gan.yaml"
 
 
 def main(args: Namespace) -> None:
@@ -18,8 +23,10 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
-    dataset = get_mnist_dataset(args.mnist_path, args.batch_size)
-    image_shape = dataset.element_spec[0].shape.as_list()[1:]
+    train_dataset, test_dataset = get_mnist_dataset(
+        args.mnist_path, args.batch_size
+    )
+    image_shape = train_dataset.element_spec[0].shape.as_list()[1:]
 
     generator = get_generator(args.noise_dims, weight_decay=args.weight_decay)
     discriminator = get_discriminator(
@@ -28,6 +35,9 @@ def main(args: Namespace) -> None:
     encoder = get_encoder(
         image_shape, args.noise_dims, weight_decay=args.weight_decay,
     )
+
+    classifier = Classifier(image_shape, NUM_CLS)
+    ClassifierTrainer.load_weights(classifier, args.load_dir)
 
     # Save each run into a directory by its timestamp
     log_dir = setup_dirs(
@@ -41,6 +51,9 @@ def main(args: Namespace) -> None:
         generator,
         discriminator,
         encoder,
+        classifier,
+        train_dataset,
+        test_dataset,
         noise_dims=args.noise_dims,
         gen_lr=args.gen_lr,
         disc_lr=args.disc_lr,
@@ -51,7 +64,6 @@ def main(args: Namespace) -> None:
         save_dir=args.save_dir,
     )
     trainer.train(
-        dataset,
         epochs=args.epochs,
         record_steps=args.record_steps,
         save_steps=args.save_steps,
@@ -122,6 +134,12 @@ if __name__ == "__main__":
         type=int,
         default=100,
         help="the number of epochs for training the GAN",
+    )
+    parser.add_argument(
+        "--load-dir",
+        type=str,
+        default="./checkpoints/",
+        help="directory where the trained classifier model is saved",
     )
     parser.add_argument(
         "--save-dir",

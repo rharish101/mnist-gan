@@ -36,12 +36,18 @@ For viewing the list of all positional and optional arguments for any script, ty
 **NOTE**: You need to be inside the virtual environment where you installed the above dependencies every time you commit.
 
 ### Training
-Run `train.py`:
-```sh
-./train.py
-```
-The trained model is saved in TensorFlow's ckpt format (to the directory given by the `--save-dir` argument).
-The training logs are by default stored inside an ISO 8601 timestamp named subdirectory, which is stored in a parent directory (as given by the `--log-dir` argument).
+* Classifier: Run `classifier.py`:
+    ```sh
+    ./classifier.py
+    ```
+
+* GAN: Run `train.py` after training a classifier:
+    ```sh
+    ./train.py
+    ```
+
+Trained models are saved in TensorFlow's ckpt format (to the directory given by the `--save-dir` argument).
+Training logs are by default stored inside an ISO 8601 timestamp named subdirectory, which is stored in a parent directory (as given by the `--log-dir` argument).
 
 ### Generation
 Run `generate.py`:

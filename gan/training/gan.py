@@ -12,7 +12,8 @@ from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 from typing_extensions import Final
 
-from .utils import get_grid, wasserstein_gradient_penalty
+from ..evaluation import RunningFID
+from ..utils import get_grid, wasserstein_gradient_penalty
 
 
 class BiGANTrainer:
@@ -27,6 +28,9 @@ class BiGANTrainer:
         generator: Model,
         discriminator: Model,
         encoder: Model,
+        classifier: Model,
+        train_dataset: Dataset,
+        val_dataset: Dataset,
         noise_dims: int,
         gen_lr: float,
         disc_lr: float,
@@ -42,6 +46,9 @@ class BiGANTrainer:
             generator: The generator model to be trained
             discriminator: The discriminator model to be trained
             encoder: The encoder model to be trained
+            classifier: The trained classifier model for FID
+            train_dataset: The dataset of real images and labels for training
+            val_dataset: The dataset of real images and labels for validation
             noise_dims: The dimensions for the inputs to the generator
             gen_lr: The learning rate for the generator's optimizer
             disc_lr: The learning rate for the discriminator's optimizer
@@ -55,10 +62,14 @@ class BiGANTrainer:
         self.discriminator = discriminator
         self.encoder = encoder
 
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
+
         self.gen_optim = Adam(gen_lr, 0.5)
         self.disc_optim = Adam(disc_lr, 0.5)
         self.enc_optim = Adam(enc_lr, 0.5)
 
+        self.evaluator = RunningFID(classifier)
         self.writer = tf.summary.create_file_writer(log_dir)
 
         self.noise_dims = noise_dims
@@ -165,6 +176,17 @@ class BiGANTrainer:
         # Returned values are used for logging summaries
         return generated, pred_noise, pred_labels, losses
 
+    def _get_fid(self) -> Tensor:
+        """Calculate FID over the validation dataset."""
+        self.evaluator.reset()
+
+        for real, lbls in self.val_dataset:
+            inputs = tf.random.normal((real.shape[0], self.noise_dims))
+            generated = self.generator([inputs, lbls])
+            self.evaluator.update(real, generated)
+
+        return self.evaluator.get_fid()
+
     def log_summaries(
         self,
         real: Tensor,
@@ -219,6 +241,10 @@ class BiGANTrainer:
                     step=global_step,
                 )
 
+            with tf.name_scope("metrics"):
+                fid = self._get_fid()
+                tf.summary.scalar("FID", fid, step=global_step)
+
             # Save generated and real images in a square grid
             with tf.name_scope("image_summary"):
                 real_grid = get_grid(real)
@@ -240,22 +266,19 @@ class BiGANTrainer:
         )
         self.encoder.save_weights(os.path.join(self.save_dir, self.ENC_PATH))
 
-    def train(
-        self, dataset: Dataset, epochs: int, record_steps: int, save_steps: int
-    ) -> None:
+    def train(self, epochs: int, record_steps: int, save_steps: int) -> None:
         """Execute the training loops for the BiGAN.
 
         Args:
-            dataset: The dataset of real images
             epochs: Number of epochs to train the GAN
             record_steps: Step interval for recording summaries
             save_steps: Step interval for saving the model
         """
-        # Total no. of batches in the dataset
-        total_batches = cardinality(dataset).numpy()
+        # Total no. of batches in the training dataset
+        total_batches = cardinality(self.train_dataset).numpy()
 
         # Iterate over dataset in epochs
-        data_in_epochs = itertools.product(range(epochs), dataset)
+        data_in_epochs = itertools.product(range(epochs), self.train_dataset)
 
         for global_step, (_, (real, lbls)) in tqdm(
             enumerate(data_in_epochs, 1),

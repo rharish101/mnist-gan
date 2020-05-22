@@ -4,6 +4,8 @@ from typing import BinaryIO, Dict, List, Tuple, Type
 
 import numpy as np
 import tensorflow as tf
+from tensorflow import Tensor
+from tensorflow.data import Dataset
 from typing_extensions import Final
 
 # Map the size as found in IDX files to their respective numpy dtypes
@@ -66,6 +68,7 @@ def load_dataset(mnist_path: str) -> Tuple[np.ndarray, np.ndarray]:
     # Prefixes and infixes for generating filenames
     prefixes: Dict[str, str] = {"train": "train", "test": "t10k"}
     infixes: Dict[str, str] = {"images": "3", "labels": "1"}
+
     for mode in prefixes:
         for data in infixes:
             filename = f"{prefixes[mode]}-{data}-idx{infixes[data]}-ubyte"
@@ -79,6 +82,7 @@ def load_dataset(mnist_path: str) -> Tuple[np.ndarray, np.ndarray]:
                 raise FileNotFoundError(
                     f'MNIST dataset file "{data_path}" not found.'
                 )
+
     print("\rLoaded MNIST dataset successfully")
 
     images = np.concatenate(
@@ -91,7 +95,7 @@ def load_dataset(mnist_path: str) -> Tuple[np.ndarray, np.ndarray]:
 
 
 @tf.function
-def preprocess(img: tf.Tensor, lbl: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+def preprocess(img: Tensor, lbl: Tensor) -> Tuple[Tensor, Tensor]:
     """Preprocess a raw MNIST image and its label.
 
     This converts a 2D 28x28 tensor in the range [0, 255] into a float32 3D
@@ -106,7 +110,7 @@ def preprocess(img: tf.Tensor, lbl: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
     return img, lbl
 
 
-def get_mnist_dataset(mnist_path: str, batch_size: int) -> tf.data.Dataset:
+def get_mnist_dataset(mnist_path: str, batch_size: int) -> Dataset:
     """Get a dataset object for the MNIST dataset.
 
     Args:
@@ -117,6 +121,6 @@ def get_mnist_dataset(mnist_path: str, batch_size: int) -> tf.data.Dataset:
         The dataset object
     """
     mnist_images, mnist_labels = load_dataset(mnist_path)
-    dataset = tf.data.Dataset.from_tensor_slices((mnist_images, mnist_labels))
+    dataset = Dataset.from_tensor_slices((mnist_images, mnist_labels))
     dataset = dataset.map(preprocess).shuffle(10000).batch(batch_size)
     return dataset

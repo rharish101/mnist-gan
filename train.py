@@ -9,7 +9,7 @@ from gan.models import get_discriminator, get_encoder, get_generator
 from gan.training import BiGANTrainer
 from gan.utils import setup_dirs
 
-CONFIG_YAML: Final[str] = "config.yaml"
+CONFIG: Final[str] = "config.yaml"
 
 
 def main(args: Namespace) -> None:
@@ -34,7 +34,7 @@ def main(args: Namespace) -> None:
         dirs=[args.save_dir],
         dirs_to_tstamp=[args.log_dir],
         config=vars(args),
-        file_name=CONFIG_YAML,
+        file_name=CONFIG,
     )[0]
 
     trainer = BiGANTrainer(
@@ -127,7 +127,7 @@ if __name__ == "__main__":
         "--save-dir",
         type=str,
         default="./checkpoints/",
-        help="directory where to save model",
+        help="directory where to save the GAN models",
     )
     parser.add_argument(
         "--save-steps",

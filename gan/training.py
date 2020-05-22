@@ -6,6 +6,7 @@ from typing import Dict, Tuple
 import tensorflow as tf
 from tensorflow import Tensor
 from tensorflow.data import Dataset
+from tensorflow.data.experimental import cardinality
 from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
@@ -251,14 +252,14 @@ class BiGANTrainer:
             save_steps: Step interval for saving the model
         """
         # Total no. of batches in the dataset
-        dataset_size = tf.data.experimental.cardinality(dataset).numpy()
+        total_batches = cardinality(dataset).numpy()
 
         # Iterate over dataset in epochs
         data_in_epochs = itertools.product(range(epochs), dataset)
 
         for global_step, (_, (real, lbls)) in tqdm(
             enumerate(data_in_epochs, 1),
-            total=epochs * dataset_size,
+            total=epochs * total_batches,
             desc="Training",
         ):
             gen, pred_noise, pred_lbls, losses = self.train_step(real, lbls)
@@ -272,3 +273,15 @@ class BiGANTrainer:
                 self.save_models()
 
         self.save_models()
+
+    @classmethod
+    def load_generator_weights(cls, generator: Model, load_dir: str) -> None:
+        """Load the generator weights from disk.
+
+        This replaces the generator's weights with the loaded ones, in place.
+
+        Args:
+            generator: The generator model whose weights are to be loaded
+            load_dir: Directory from where to load model weights
+        """
+        generator.load_weights(os.path.join(load_dir, cls.GEN_PATH))

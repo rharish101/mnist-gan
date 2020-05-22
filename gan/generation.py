@@ -6,7 +6,7 @@ from tensorflow.keras import Model
 from tqdm import tqdm
 
 
-class BiGANImgGenHelper:
+class BiGANEvaluator:
     """Class to generate images using an MNIST BiGAN."""
 
     def __init__(self, generator: Model, noise_dims: int) -> None:

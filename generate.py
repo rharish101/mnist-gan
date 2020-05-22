@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Generating MNIST digits using a conditional BiGAN."""
-import os
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
-from gan.generation import BiGANImgGenHelper
+from gan.evaluation import BiGANEvaluator
 from gan.models import get_generator
 from gan.training import BiGANTrainer
 
@@ -15,9 +14,9 @@ def main(args: Namespace) -> None:
         args: The object containing the commandline arguments
     """
     generator = get_generator(args.noise_dims)
-    generator.load_weights(os.path.join(args.load_dir, BiGANTrainer.GEN_PATH))
+    BiGANTrainer.load_generator_weights(generator, args.load_dir)
 
-    helper = BiGANImgGenHelper(generator, noise_dims=args.noise_dims)
+    helper = BiGANEvaluator(generator, noise_dims=args.noise_dims)
     helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
 
 

@@ -95,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gp-weight",
         type=float,
-        default=1.0,
+        default=10.0,
         help="weights for the critic's gradient penalty",
     )
     parser.add_argument(
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs",
         type=int,
-        default=100,
+        default=40,
         help="the number of epochs for training the GAN",
     )
     parser.add_argument(
@@ -126,13 +126,13 @@ if __name__ == "__main__":
         "--save-steps",
         type=int,
         default=5000,
-        help="the frequency of saving the model",
+        help="the frequency of saving the model (in steps)",
     )
     parser.add_argument(
         "--record-steps",
         type=int,
-        default=100,
-        help="the frequency of recording summaries",
+        default=500,
+        help="the frequency of recording summaries (in steps)",
     )
     parser.add_argument(
         "--log-dir",

@@ -1,6 +1,6 @@
 # MNIST GAN
 
-This is a repository for training a conditional MNIST BiGAN.
+This is a repository for training a conditional MNIST GAN.
 This requires Python 3.6+.
 
 ## Instructions

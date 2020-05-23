@@ -16,27 +16,23 @@ from ..evaluation import RunningFID
 from ..utils import get_grid, wasserstein_gradient_penalty
 
 
-class BiGANTrainer:
-    """Class to train an MNIST BiGAN."""
+class GANTrainer:
+    """Class to train an MNIST GAN."""
 
     GEN_PATH: Final[str] = "generator.ckpt"
-    DISC_PATH: Final[str] = "discriminator.ckpt"
-    ENC_PATH: Final[str] = "encoder.ckpt"
+    CRIT_PATH: Final[str] = "critic.ckpt"
 
     def __init__(
         self,
         generator: Model,
-        discriminator: Model,
-        encoder: Model,
+        critic: Model,
         classifier: Model,
         train_dataset: Dataset,
         val_dataset: Dataset,
         noise_dims: int,
         gen_lr: float,
-        disc_lr: float,
-        enc_lr: float,
+        crit_lr: float,
         gp_weight: float,
-        cl_weight: float,
         log_dir: str,
         save_dir: str,
     ) -> None:
@@ -44,44 +40,38 @@ class BiGANTrainer:
 
         Args:
             generator: The generator model to be trained
-            discriminator: The discriminator model to be trained
-            encoder: The encoder model to be trained
+            critic: The critic model to be trained
             classifier: The trained classifier model for FID
             train_dataset: The dataset of real images and labels for training
             val_dataset: The dataset of real images and labels for validation
             noise_dims: The dimensions for the inputs to the generator
             gen_lr: The learning rate for the generator's optimizer
-            disc_lr: The learning rate for the discriminator's optimizer
-            enc_lr: The learning rate for the encoder's optimizer
-            gp_weight: Weights for the discriminator's gradient penalty
-            cl_weight: Weights for the encoder's classification loss
+            crit_lr: The learning rate for the critic's optimizer
+            gp_weight: Weights for the critic's gradient penalty
             log_dir: Directory where to write event logs
             save_dir: Directory where to store model weights
         """
         self.generator = generator
-        self.discriminator = discriminator
-        self.encoder = encoder
+        self.critic = critic
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
 
         self.gen_optim = Adam(gen_lr, 0.5)
-        self.disc_optim = Adam(disc_lr, 0.5)
-        self.enc_optim = Adam(enc_lr, 0.5)
+        self.crit_optim = Adam(crit_lr, 0.5)
 
         self.evaluator = RunningFID(classifier)
         self.writer = tf.summary.create_file_writer(log_dir)
 
         self.noise_dims = noise_dims
         self.gp_weight = gp_weight
-        self.cl_weight = cl_weight
 
         self.save_dir = save_dir
 
     @tf.function
     def train_step(
         self, real: Tensor, labels: Tensor
-    ) -> Tuple[Tensor, Tensor, Tensor, Dict[str, Tensor]]:
+    ) -> Tuple[Tensor, Dict[str, Tensor]]:
         """Run a single training step.
 
         The returned dict of losses are used for logging summaries.
@@ -92,65 +82,42 @@ class BiGANTrainer:
 
         Returns:
             The generated images
-            The predicted latent vectors for the real images
-            The predicted labels for the real images
             dict: The dictionary of losses, as required by `log_summaries`
         """
         noise = tf.random.normal((real.get_shape()[0], self.noise_dims))
 
         with tf.GradientTape(persistent=True) as tape:
-            pred_noise, pred_logits_real = self.encoder(real, training=True)
-            pred_labels = tf.argmax(pred_logits_real, axis=-1)
-            dis_real_out = self.discriminator(
-                [real, pred_noise, pred_labels], training=True
-            )
+            crit_real_out = self.critic([real, labels], training=True)
+
+            generated = self.generator([noise, labels], training=True)
+            crit_fake_out = self.critic([generated, labels], training=True)
 
             # Tape for calculating gradient-penalty
             with tf.GradientTape() as gp_tape:
-                # By default, the tape only tracks whatever's computed inside.
-                # This forces it to track the noise, which is needed for the
-                # gradient penalty loss.
-                gp_tape.watch(noise)
+                # U[0, 1] random value used for linear interpolation
+                gp_rand = tf.random.uniform(())
+                gp_inputs = real * gp_rand + generated * (1 - gp_rand)
 
-                generated = self.generator([noise, labels], training=True)
-                dis_fake_out = self.discriminator(
-                    [generated, noise, labels], training=True
-                )
-
-            _, pred_logits_gen = self.encoder(generated, training=True)
-
-            # Classification loss for the generator and encoder
-            class_loss = tf.reduce_mean(
-                # Loss for real images
-                tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    labels=labels, logits=pred_logits_real
-                )
-                # Loss for generated images
-                + tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    labels=labels, logits=pred_logits_gen
-                )
-            )
+                # Forces the tape to track the inputs, which is needed for
+                # calculating gradients in the gradient penalty.
+                gp_tape.watch(gp_inputs)
+                crit_gp_out = self.critic([gp_inputs, labels], training=True)
 
             # Total Wasserstein loss
-            wass_loss = tf.reduce_mean(dis_real_out - dis_fake_out)
+            wass_loss = tf.reduce_mean(crit_real_out - crit_fake_out)
 
             gen_reg = sum(self.generator.losses)
-            gen_loss = wass_loss + gen_reg + self.cl_weight * class_loss
+            gen_loss = wass_loss + gen_reg
 
-            disc_reg = sum(self.discriminator.losses)
+            crit_reg = sum(self.critic.losses)
             grad_pen = wasserstein_gradient_penalty(
-                noise, dis_fake_out, gp_tape
+                gp_inputs, crit_gp_out, gp_tape
             )
-            disc_loss = -wass_loss + disc_reg + self.gp_weight * grad_pen
+            crit_loss = -wass_loss + crit_reg + self.gp_weight * grad_pen
 
-            enc_reg = sum(self.encoder.losses)
-            enc_loss = wass_loss + enc_reg + self.cl_weight * class_loss
-
-        disc_grads = tape.gradient(
-            disc_loss, self.discriminator.trainable_variables
-        )
-        self.disc_optim.apply_gradients(
-            zip(disc_grads, self.discriminator.trainable_variables)
+        crit_grads = tape.gradient(crit_loss, self.critic.trainable_variables)
+        self.crit_optim.apply_gradients(
+            zip(crit_grads, self.critic.trainable_variables)
         )
 
         gen_grads = tape.gradient(gen_loss, self.generator.trainable_variables)
@@ -158,23 +125,16 @@ class BiGANTrainer:
             zip(gen_grads, self.generator.trainable_variables)
         )
 
-        enc_grads = tape.gradient(enc_loss, self.encoder.trainable_variables)
-        self.enc_optim.apply_gradients(
-            zip(enc_grads, self.encoder.trainable_variables)
-        )
-
         # Losses required for logging summaries
         losses = {
             "wass": wass_loss,
-            "class": class_loss,
             "grad_pen": grad_pen,
             "gen_reg": gen_reg,
-            "disc_reg": disc_reg,
-            "enc_reg": enc_reg,
+            "crit_reg": crit_reg,
         }
 
         # Returned values are used for logging summaries
-        return generated, pred_noise, pred_labels, losses
+        return generated, losses
 
     def _get_fid(self) -> Tensor:
         """Calculate FID over the validation dataset."""
@@ -191,8 +151,6 @@ class BiGANTrainer:
         self,
         real: Tensor,
         generated: Tensor,
-        pred_noise: Tensor,
-        pred_labels: Tensor,
         losses: Dict[str, Tensor],
         global_step: int,
     ) -> None:
@@ -200,17 +158,13 @@ class BiGANTrainer:
 
         The dict of losses should have the following key-value pairs:
             wass: The Wasserstein loss
-            class: The classification loss
             grad_pen: The Wasserstein gradient penalty
             gen_reg: The L2 regularization loss for the generator
-            disc_reg: The L2 regularization loss for the discriminator
-            enc_reg: The L2 regularization loss for the encoder
+            crit_reg: The L2 regularization loss for the critic
 
         Args:
             real: The input real images
             generated: The generated images
-            pred_noise: The predicted latent vectors for the real images
-            pred_labels: The predicted labels for the real images
             losses: The dictionary of losses
             global_step: The current global training step
         """
@@ -218,9 +172,6 @@ class BiGANTrainer:
             with tf.name_scope("losses"):
                 tf.summary.scalar(
                     "wasserstein loss", losses["wass"], step=global_step,
-                )
-                tf.summary.scalar(
-                    "classification loss", losses["class"], step=global_step,
                 )
                 tf.summary.scalar(
                     "gradient penalty", losses["grad_pen"], step=global_step,
@@ -231,13 +182,8 @@ class BiGANTrainer:
                     step=global_step,
                 )
                 tf.summary.scalar(
-                    "discriminator regularization",
-                    losses["disc_reg"],
-                    step=global_step,
-                )
-                tf.summary.scalar(
-                    "encoder regularization",
-                    losses["enc_reg"],
+                    "critic regularization",
+                    losses["crit_reg"],
                     step=global_step,
                 )
 
@@ -249,25 +195,19 @@ class BiGANTrainer:
             with tf.name_scope("image_summary"):
                 real_grid = get_grid(real)
                 gen_grid = get_grid(generated)
-                recons_grid = get_grid(
-                    self.generator([pred_noise, pred_labels])
-                )
                 tf.summary.image("real", real_grid, step=global_step)
                 tf.summary.image("generated", gen_grid, step=global_step)
-                tf.summary.image(
-                    "reconstructed", recons_grid, step=global_step,
-                )
 
     def save_models(self) -> None:
         """Save the models to disk."""
-        self.generator.save_weights(os.path.join(self.save_dir, self.GEN_PATH))
-        self.discriminator.save_weights(
-            os.path.join(self.save_dir, self.DISC_PATH)
-        )
-        self.encoder.save_weights(os.path.join(self.save_dir, self.ENC_PATH))
+        for model, file_name in [
+            (self.generator, self.GEN_PATH),
+            (self.critic, self.CRIT_PATH),
+        ]:
+            model.save_weights(os.path.join(self.save_dir, file_name))
 
     def train(self, epochs: int, record_steps: int, save_steps: int) -> None:
-        """Execute the training loops for the BiGAN.
+        """Execute the training loops for the GAN.
 
         Args:
             epochs: Number of epochs to train the GAN
@@ -285,11 +225,11 @@ class BiGANTrainer:
             total=epochs * total_batches,
             desc="Training",
         ):
-            gen, pred_noise, pred_lbls, losses = self.train_step(real, lbls)
+            gen, losses = self.train_step(real, lbls)
 
             if global_step % record_steps == 0:
                 self.log_summaries(
-                    real, gen, pred_noise, pred_lbls, losses, global_step,
+                    real, gen, losses, global_step,
                 )
 
             if global_step % save_steps == 0:

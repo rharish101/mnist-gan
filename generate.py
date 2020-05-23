@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Generating MNIST digits using a conditional BiGAN."""
+"""Generating MNIST digits using a conditional GAN."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
-from gan.evaluation import BiGANEvaluator
+from gan.evaluation import GANEvaluator
 from gan.models import get_generator
-from gan.training import BiGANTrainer
+from gan.training import GANTrainer
 
 
 def main(args: Namespace) -> None:
@@ -14,15 +14,15 @@ def main(args: Namespace) -> None:
         args: The object containing the commandline arguments
     """
     generator = get_generator(args.noise_dims)
-    BiGANTrainer.load_generator_weights(generator, args.load_dir)
+    GANTrainer.load_generator_weights(generator, args.load_dir)
 
-    helper = BiGANEvaluator(generator, noise_dims=args.noise_dims)
+    helper = GANEvaluator(generator, noise_dims=args.noise_dims)
     helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
 
 
 if __name__ == "__main__":
     parser = ArgumentParser(
-        description="Generating MNIST digits using a conditional BiGAN",
+        description="Generating MNIST digits using a conditional GAN",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(

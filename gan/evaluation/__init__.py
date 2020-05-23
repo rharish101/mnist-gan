@@ -1,5 +1,5 @@
 """Classes for evaluation."""
 from .fid import RunningFID
-from .gan import BiGANEvaluator
+from .gan import GANEvaluator
 
-__all__ = ["RunningFID", "BiGANEvaluator"]
+__all__ = ["RunningFID", "GANEvaluator"]

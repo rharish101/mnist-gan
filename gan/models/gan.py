@@ -1,4 +1,4 @@
-"""Generator, discriminator and encoder network models for MNIST."""
+"""Generator and critic network models for MNIST."""
 from typing import Tuple, Type, Union
 
 import tensorflow as tf
@@ -73,9 +73,9 @@ def spectralize(layer: Type[Layer]) -> Type[Layer]:  # noqa: D202
 class Conditioning(Layer):
     """Class for the conditioning layer.
 
-    This layer conditions with both the noise and the class labels. An
-    embedding layer is used for the class labels without passing through a
-    dense layer as the no. of classes is smaller than typical embedding sizes.
+    This layer conditions with the class labels. An embedding layer is used for
+    the class labels without passing through a dense layer as the no. of
+    classes is smaller than typical embedding sizes.
     """
 
     def __init__(self, weight_decay: float) -> None:
@@ -83,20 +83,9 @@ class Conditioning(Layer):
         super().__init__()
         self.weight_decay = weight_decay
 
-    def build(self, input_shape: Tuple[Shape, Shape, Shape]) -> None:
+    def build(self, input_shape: Tuple[Shape, Shape]) -> None:
         """Initialize the Conv2DTranspose and Embedding layers."""
-        tensor_shape, noise_shape, _ = input_shape
-
-        noise_new_shape = [noise_shape[0], 1, 1, noise_shape[1]]
-        self.conv_t = Conv2DTranspose(
-            tensor_shape[-1],
-            tensor_shape[1:3],
-            strides=1,
-            use_bias=False,
-            kernel_regularizer=l2(self.weight_decay),
-            input_shape=noise_new_shape,
-        )
-
+        tensor_shape, _ = input_shape
         flat_dim = tensor_shape[1] * tensor_shape[2] * tensor_shape[3]
         self.embed = Embedding(
             10,
@@ -105,29 +94,21 @@ class Conditioning(Layer):
             embeddings_regularizer=l2(self.weight_decay),
         )
 
-        # Keep reference to the conv kernel for applying spectral norm
-        self.conv_t.build(noise_new_shape)
-        self.kernel = self.conv_t.kernel
-
-    def call(self, inputs: Tuple[Tensor, Tensor, Tensor]) -> Tensor:
-        """Condition the tensor from the noise and label vectors.
+    def call(self, inputs: Tuple[Tensor, Tensor]) -> Tensor:
+        """Condition the tensor from the label vectors.
 
         Args:
-            inputs: A tuple of three tensors:
+            inputs: A tuple of the following tensors:
                 * The tensor to be conditioned
-                * The noise
                 * The labels
 
         Returns:
             The conditioned tensor
-
         """
-        tensor, noise, labels = inputs
-        reshaped = tf.reshape(noise, [-1, 1, 1, noise.shape[1]])
-        noise_cond = self.conv_t(reshaped)
+        tensor, labels = inputs
         embeddings = self.embed(labels)
         labels_cond = tf.reshape(embeddings, [-1, *tensor.shape[1:]])
-        return tensor + noise_cond + labels_cond
+        return tensor + labels_cond
 
 
 def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
@@ -182,27 +163,21 @@ def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
     return Model(inputs=[noise, labels], outputs=outputs)
 
 
-def get_discriminator(
-    input_shape: Tuple[int, int, int],
-    noise_dims: int,
-    weight_decay: float = 2.5e-5,
+def get_critic(
+    input_shape: Tuple[int, int, int], weight_decay: float = 2.5e-5,
 ) -> Model:
-    """Return the discriminator model.
+    """Return the critic model.
 
     Args:
-        input_shape: The shape of the input to the discriminator excluding the
-            batch size
-        noise_dims: The dimensions of the input to the generator
+        input_shape: The shape of the input images excluding the batch size
         weight_decay: The decay for L2 regularization
 
     Returns:
-        The discriminator model
+        The critic model
     """
     SpectralConv2D = spectralize(Conv2D)
-    SpectralConditioning = spectralize(Conditioning)
 
     inputs = Input(shape=input_shape)
-    noise = Input(shape=[noise_dims])
     labels = Input(shape=[])
 
     def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
@@ -215,7 +190,7 @@ def get_discriminator(
             kernel_regularizer=l2(weight_decay),
             input_shape=input_shape,
         )(inputs)
-        x = SpectralConditioning(weight_decay)((x, noise, labels))
+        x = Conditioning(weight_decay)((x, labels))
         if norm:
             x = LayerNormalization()(x)
         x = LeakyReLU(alpha=0.2)(x)
@@ -235,65 +210,4 @@ def get_discriminator(
         kernel_regularizer=l2(weight_decay),
     )(x)
 
-    return Model(inputs=[inputs, noise, labels], outputs=outputs)
-
-
-def get_encoder(
-    input_shape: Tuple[int, int, int],
-    noise_dims: int,
-    weight_decay: float = 2.5e-5,
-) -> Model:
-    """Return the encoder model.
-
-    Args:
-        input_shape: The shape of the input to the encoder excluding
-            the batch size
-        noise_dims: The dimensions of the input to the generator model
-        weight_decay: The decay for L2 regularization
-
-    Returns:
-        The encoder model
-    """
-    inputs = Input(shape=input_shape)
-
-    def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
-        x = Conv2D(
-            filters,
-            4,
-            strides=2,
-            padding="same",
-            use_bias=False,
-            kernel_regularizer=l2(weight_decay),
-            input_shape=input_shape,
-        )(inputs)
-        if norm:
-            x = BatchNormalization()(x)
-        x = LeakyReLU(alpha=0.2)(x)
-        return x
-
-    x = conv_block(inputs, 64, norm=False)
-    x = conv_block(x, 128)
-    x = conv_block(x, 256)
-    x = conv_block(x, 512)
-
-    noise = Conv2D(
-        noise_dims,
-        4,
-        strides=1,
-        padding="valid",
-        use_bias=False,
-        kernel_regularizer=l2(weight_decay),
-    )(x)
-    noise = Reshape([noise_dims])(noise)
-
-    logits = Conv2D(
-        10,
-        4,
-        strides=1,
-        padding="valid",
-        use_bias=False,
-        kernel_regularizer=l2(weight_decay),
-    )(x)
-    logits = Reshape([10])(logits)
-
-    return Model(inputs=inputs, outputs=[noise, logits])
+    return Model(inputs=[inputs, labels], outputs=outputs)

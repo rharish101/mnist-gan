@@ -17,9 +17,8 @@ def wasserstein_gradient_penalty(
     The original paper can be found at: https://arxiv.org/abs/1704.00028
 
     Args:
-        inputs: The inputs for the generator
-        outputs: The discriminator's outputs for the images generated from the
-            above inputs
+        inputs: The inputs for the critic
+        outputs: The critic's outputs for the above inputs
         tape: The persistent gradient tape for calculating gradients
 
     Returns:

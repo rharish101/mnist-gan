@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-"""Training a conditional BiGAN for MNIST."""
+"""Training a conditional GAN for MNIST."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
 from typing_extensions import Final
 
 from gan.data import NUM_CLS, get_mnist_dataset
-from gan.models import (
-    Classifier,
-    get_discriminator,
-    get_encoder,
-    get_generator,
-)
-from gan.training import BiGANTrainer, ClassifierTrainer
+from gan.models import Classifier, get_critic, get_generator
+from gan.training import ClassifierTrainer, GANTrainer
 from gan.utils import setup_dirs
 
 CONFIG: Final[str] = "config-gan.yaml"
@@ -29,12 +24,7 @@ def main(args: Namespace) -> None:
     image_shape = train_dataset.element_spec[0].shape.as_list()[1:]
 
     generator = get_generator(args.noise_dims, weight_decay=args.weight_decay)
-    discriminator = get_discriminator(
-        image_shape, args.noise_dims, weight_decay=args.weight_decay,
-    )
-    encoder = get_encoder(
-        image_shape, args.noise_dims, weight_decay=args.weight_decay,
-    )
+    critic = get_critic(image_shape, weight_decay=args.weight_decay)
 
     classifier = Classifier(image_shape, NUM_CLS)
     ClassifierTrainer.load_weights(classifier, args.load_dir)
@@ -47,19 +37,16 @@ def main(args: Namespace) -> None:
         file_name=CONFIG,
     )[0]
 
-    trainer = BiGANTrainer(
+    trainer = GANTrainer(
         generator,
-        discriminator,
-        encoder,
+        critic,
         classifier,
         train_dataset,
         test_dataset,
         noise_dims=args.noise_dims,
         gen_lr=args.gen_lr,
-        disc_lr=args.disc_lr,
-        enc_lr=args.enc_lr,
+        crit_lr=args.crit_lr,
         gp_weight=args.gp_weight,
-        cl_weight=args.cl_weight,
         log_dir=log_dir,
         save_dir=args.save_dir,
     )
@@ -72,7 +59,7 @@ def main(args: Namespace) -> None:
 
 if __name__ == "__main__":
     parser = ArgumentParser(
-        description="Training an conditional BiGAN for MNIST",
+        description="Training an conditional GAN for MNIST",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -100,28 +87,16 @@ if __name__ == "__main__":
         help="learning rate for generator optimization",
     )
     parser.add_argument(
-        "--disc-lr",
+        "--crit-lr",
         type=float,
         default=1e-4,
-        help="learning rate for discriminator optimization",
-    )
-    parser.add_argument(
-        "--enc-lr",
-        type=float,
-        default=2e-4,
-        help="learning rate for encoder optimization",
+        help="learning rate for critic optimization",
     )
     parser.add_argument(
         "--gp-weight",
         type=float,
         default=1.0,
-        help="weights for the discriminator's gradient penalty",
-    )
-    parser.add_argument(
-        "--cl-weight",
-        type=float,
-        default=1.0,
-        help="weights for the encoder's classification loss",
+        help="weights for the critic's gradient penalty",
     )
     parser.add_argument(
         "--weight-decay",

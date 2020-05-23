@@ -6,8 +6,8 @@ from tensorflow.keras import Model
 from tqdm import tqdm
 
 
-class BiGANEvaluator:
-    """Class to generate images using an MNIST BiGAN."""
+class GANEvaluator:
+    """Class to generate images using an MNIST GAN."""
 
     def __init__(self, generator: Model, noise_dims: int) -> None:
         """Store the required objects and info.

@@ -9,6 +9,7 @@ from tensorflow.data import Dataset
 from typing_extensions import Final
 
 NUM_CLS: Final[int] = 10  # number of classes in MNIST
+IMG_SIZE: Final[Tuple[int, int]] = (64, 64)  # images will be resized to this
 
 # Map the size as found in IDX files to their respective numpy dtypes
 SIZE_TO_DTYPE: Final[Dict[int, Type[np.number]]] = {
@@ -101,12 +102,13 @@ def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
 def preprocess(img: Tensor, lbl: Tensor) -> Tuple[Tensor, Tensor]:
     """Preprocess a raw MNIST image and its label.
 
-    This converts a 2D 28x28 tensor in the range [0, 255] into a float32 3D
-    64x64x1 tensor in the range [-1, 1]. This also casts the label into int64.
+    This converts a 2D (width, height) tensor in the range [0, 255] into a
+    float32 3D (width, height, channels) tensor in the range [-1, 1], after
+    resizing. This also casts the label into int64.
     """
     img = tf.expand_dims(img, -1)
     # This resizes and converts to float32 in the range [0, 255]
-    img = tf.image.resize(img, (64, 64))
+    img = tf.image.resize(img, IMG_SIZE)
     # Scale from [0, 255] to [-1, 1]
     img = (img / 255) * 2 - 1
     lbl = tf.cast(lbl, tf.int64)

@@ -128,37 +128,30 @@ def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
         10, 64, input_length=1, embeddings_regularizer=l2(weight_decay)
     )(labels)
     x = Concatenate(axis=-1)([noise, cond])
-    x = Reshape([1, 1, noise_dims + cond.shape[-1]])(x)
+    x = Reshape([1, 1, x.shape[-1]])(x)
 
     def conv_t_block(
-        inputs: Tensor, filters: int, first: bool = False
+        inputs: Tensor, filters: int, first: bool = False, last: bool = False
     ) -> Tensor:
         x = Conv2DTranspose(
-            filters,
-            4,
+            filters=filters,
+            kernel_size=4,
             strides=1 if first else 2,
             padding="valid" if first else "same",
+            activation="tanh" if last else None,
             use_bias=False,
             kernel_regularizer=l2(weight_decay),
         )(inputs)
-        x = BatchNormalization()(x)
-        x = ReLU()(x)
+        if not last:
+            x = BatchNormalization()(x)
+            x = ReLU()(x)
         return x
 
     x = conv_t_block(x, 512, first=True)
     x = conv_t_block(x, 256)
     x = conv_t_block(x, 128)
     x = conv_t_block(x, 64)
-
-    outputs = Conv2DTranspose(
-        1,
-        4,
-        strides=2,
-        padding="same",
-        activation="tanh",
-        use_bias=False,
-        kernel_regularizer=l2(weight_decay),
-    )(x)
+    outputs = conv_t_block(x, 1, last=True)
 
     return Model(inputs=[noise, labels], outputs=outputs)
 
@@ -202,8 +195,8 @@ def get_critic(
     x = conv_block(x, 512)
 
     outputs = SpectralConv2D(
-        1,
-        4,
+        filters=1,
+        kernel_size=4,
         strides=1,
         padding="valid",
         use_bias=False,

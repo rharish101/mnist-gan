@@ -139,7 +139,7 @@ def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
             strides=1 if first else 2,
             padding="valid" if first else "same",
             activation="tanh" if last else None,
-            use_bias=False,
+            use_bias=True if last else False,
             kernel_regularizer=l2(weight_decay),
         )(inputs)
         if not last:
@@ -199,7 +199,7 @@ def get_critic(
         kernel_size=4,
         strides=1,
         padding="valid",
-        use_bias=False,
+        use_bias=True,
         kernel_regularizer=l2(weight_decay),
     )(x)
 

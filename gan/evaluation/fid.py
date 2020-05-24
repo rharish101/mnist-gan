@@ -84,6 +84,7 @@ class RunningFID:
         """
         # Notation for the following comments:
         # Shapes: D: dimensions
+        # ': transpose along last two dimensions
         # @: matrix multiplication along last two dimensions
         # +: element-wise addition along all dimensions
         # -: element-wise subtraction along all dimensions
@@ -100,7 +101,7 @@ class RunningFID:
         # D = D / scalar
         mean = self._feat_sum[kind] / normalizer
 
-        # Calculate covariance as: Cov[x] = E[xx'] - (E[x])^2
+        # Calculate covariance as: Cov[x] = E[xx'] - E[x] @ E[x]'
         # DxD = Dx1 @ 1xD
         mean_outer = tf.expand_dims(mean, -1) @ tf.expand_dims(mean, -2)
         # DxD = DxD / scalar
@@ -143,13 +144,13 @@ class RunningFID:
         for kind in "real", "gen":
             mean[kind], cov[kind] = self._get_mean_cov(kind)
 
-        dist_1 = tf.norm(mean["real"] - mean["gen"])
+        dist_1 = tf.math.reduce_sum((mean["real"] - mean["gen"]) ** 2)
         dist_2 = tf.linalg.trace(
             cov["real"]
             + cov["gen"]
             - 2 * tf.linalg.sqrtm(cov["real"] @ cov["gen"])
         )
-        dist = dist_1 + dist_2
+        dist = tf.math.sqrt(dist_1 + dist_2)
 
         return dist
 

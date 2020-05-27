@@ -1,9 +1,11 @@
 """Class for calculating FID."""
-from typing import Tuple
+from typing import Dict, Tuple
 
 import tensorflow as tf
 from tensorflow import Tensor
 from tensorflow.keras import Model
+
+from ..utils import sqrtm
 
 
 class RunningFID:
@@ -25,91 +27,69 @@ class RunningFID:
 
     def reset(self) -> None:
         """Reset the running metrics."""
-        # The running metrics are the sufficient statistics for the Gaussian
-        # distribution along with the number of examples.
-        self._feat_sum = {"real": 0, "gen": 0}
-        self._feat_sum_outer = {"real": 0, "gen": 0}
-        self._num_eg = {"real": 0, "gen": 0}
+        # The running metrics are the mean and covariance for the Gaussian
+        # distribution along with the total number of examples.
+        self._mean: Dict[str, Tensor] = {
+            "real": tf.zeros([], dtype=tf.float64),
+            "gen": tf.zeros([], dtype=tf.float64),
+        }
+        self._cov: Dict[str, Tensor] = {
+            "real": tf.zeros([], dtype=tf.float64),
+            "gen": tf.zeros([], dtype=tf.float64),
+        }
+        self._total_num: Dict[str, Tensor] = {
+            "real": tf.zeros([], dtype=tf.float64),
+            "gen": tf.zeros([], dtype=tf.float64),
+        }
 
-    @staticmethod
     @tf.function
-    def _get_running_params_gauss(
-        feat: Tensor,
+    def _get_updated_metrics(
+        self, feat: Tensor, kind: str
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Get the running parameters for the given samples.
+        """Get the updated values of the running metrics.
 
-        The samples are assumed to be IID Gaussian. Thus, the running
-        parameters required to estimate multivariate Gaussians are the
-        sufficient statistics and the number of examples.
+        The running metrics here are the mean, the covariance, and the total
+        number of examples.
 
-        Args:
-            feat: The batch of 1D features, as a 2D tensor
-
-        Returns:
-            The sum (the first sufficient statistic)
-            The sum of outer products (the second sufficient statistic)
-            The total number of examples
-        """
-        # Notation for the following comments:
-        # Shapes: B1, B2, ...: batch_size dimensions, D: dimensions
-        # *: scalar multiplication
-        # @: matrix multiplication along last two dimensions
-        # sum(X, dim=[n, ...]): reduce X by summing along the n, ... dimensions
-        # Broadcasting rules are assumed throughout.
-
-        # D = sum(B1xB2x...xD, dim=[B1, B2, ...])
-        feat_sum = tf.math.reduce_sum(feat, range(len(feat.shape) - 1))
-
-        # B1xB2x...xDxD = B1xB2x...xDx1 @ B1xB2x...x1xD
-        outer_prod = tf.expand_dims(feat, -1) @ tf.expand_dims(feat, -2)
-        # DxD = sum(B1xB2x...xDxD, dim=[B1, B2, ...])
-        feat_sum_outer = tf.math.reduce_sum(
-            outer_prod, range(len(outer_prod.shape) - 2)
-        )
-
-        # scalar = B1 * B2 * ...
-        num_eg = tf.math.reduce_prod(feat.shape[:-1])
-
-        return feat_sum, feat_sum_outer, num_eg
-
-    def _get_mean_cov(self, kind: str) -> Tuple[Tensor, Tensor]:
-        """Get the mean and covariance from the running metrics.
+        The stable online mean and covariance are calculated using:
+        https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Weighted_batched_version
 
         Args:
+            feat: The batch of 1D features
             kind: The kind of metrics to use. Must be one of: ["real", "gen"]
 
         Returns:
-            The mean for the requested running metrics
-            The covariance for the requested running metrics
+            The updated running mean
+            The updated running covariance
+            The updated total number of examples
         """
         # Notation for the following comments:
-        # Shapes: D: dimensions
-        # ': transpose along last two dimensions
-        # @: matrix multiplication along last two dimensions
-        # +: element-wise addition along all dimensions
-        # -: element-wise subtraction along all dimensions
-        # /: element-wise division along all dimensions
+        # Shapes: B: batch_size, D: dimensions
+        # ': transpose
+        # @: matrix multiplication
+        # sum(X, axis=n): reduce X by summing along the n^th dimension
         # Broadcasting rules are assumed throughout.
 
-        # Epsilon is the fuzz factor to prevent divide-by-zero
-        # scalar = scalar + scalar
-        normalizer = (
-            tf.cast(self._num_eg[kind], tf.float32)
-            + tf.keras.backend.epsilon()
-        )
+        old_mean = self._mean[kind]
+        old_cov = self._cov[kind]
+        old_num = self._total_num[kind]
 
-        # D = D / scalar
-        mean = self._feat_sum[kind] / normalizer
+        # Reduce any extra batch axes to a single batch axis
+        feat = tf.reshape(feat, [-1, feat.shape[-1]])
 
-        # Calculate covariance as: Cov[x] = E[xx'] - E[x] @ E[x]'
-        # DxD = Dx1 @ 1xD
-        mean_outer = tf.expand_dims(mean, -1) @ tf.expand_dims(mean, -2)
-        # DxD = DxD / scalar
-        feat_sum_outer_normalized = self._feat_sum_outer[kind] / normalizer
-        # DxD = DxD - DxD
-        cov = feat_sum_outer_normalized - mean_outer
+        # Need this to be float64 to multiply with other float64 tensors
+        num = tf.cast(feat.shape[0], tf.float64)
+        new_num = old_num + num
 
-        return mean, cov
+        # D = sum(BxD, axis=B)
+        feat_sum = tf.math.reduce_sum(feat, axis=0)
+        new_mean = old_mean + (feat_sum - num * old_mean) / new_num
+
+        # DxD = (BxD - 1xD)' @ (BxD - 1xD)
+        cov_update = tf.transpose(feat - old_mean) @ (feat - new_mean)
+        new_cov = old_cov + (cov_update - num * old_cov) / new_num
+
+        return new_mean, new_cov, new_num
 
     def update(self, real: Tensor, generated: Tensor) -> None:
         """Update the running metrics with the given info.
@@ -118,18 +98,18 @@ class RunningFID:
             real: The batch of real images
             generated: The batch of generated images
         """
-        real_feat = self.classifier.feature_extract(real)
-        gen_feat = self.classifier.feature_extract(generated)
-
-        updates = {
-            "real": self._get_running_params_gauss(real_feat),
-            "gen": self._get_running_params_gauss(gen_feat),
+        features = {
+            "real": self.classifier.feature_extract(real),
+            "gen": self.classifier.feature_extract(generated),
         }
 
-        for kind in "real", "gen":
-            self._feat_sum[kind] += updates[kind][0]
-            self._feat_sum_outer[kind] += updates[kind][1]
-            self._num_eg[kind] += updates[kind][2]
+        for kind in features:
+            # Cast to float64 for higher accuracy
+            feat = tf.cast(features[kind], tf.float64)
+            updates = self._get_updated_metrics(feat, kind)
+            self._mean[kind] = updates[0]
+            self._cov[kind] = updates[1]
+            self._total_num[kind] = updates[2]
 
     @tf.function
     def get_fid(self) -> Tensor:
@@ -138,19 +118,18 @@ class RunningFID:
         Returns:
             The FID between the two samples
         """
-        mean = {}
-        cov = {}
-
-        for kind in "real", "gen":
-            mean[kind], cov[kind] = self._get_mean_cov(kind)
-
-        dist_1 = tf.math.reduce_sum((mean["real"] - mean["gen"]) ** 2)
+        dist_1 = tf.math.reduce_sum(
+            (self._mean["real"] - self._mean["gen"]) ** 2
+        )
         dist_2 = tf.linalg.trace(
-            cov["real"]
-            + cov["gen"]
-            - 2 * tf.linalg.sqrtm(cov["real"] @ cov["gen"])
+            self._cov["real"]
+            + self._cov["gen"]
+            - 2 * sqrtm(self._cov["real"] @ self._cov["gen"])
         )
         dist = tf.math.sqrt(dist_1 + dist_2)
+
+        # Cast back to the classifier's output dtype from float64
+        dist = tf.cast(dist, self.classifier.dtype)
 
         return dist
 

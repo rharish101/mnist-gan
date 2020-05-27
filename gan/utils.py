@@ -31,6 +31,42 @@ def wasserstein_gradient_penalty(
 
 
 @tf.function
+def sqrtm(tensor: Tensor) -> Tensor:
+    """Return the matrix sqrt of a tensor along the last two dimensions.
+
+    This computes the square root of a positive definite matrix, with support
+    for batching. This is modified from the following implementation:
+    https://github.com/pytorch/pytorch/issues/25481#issuecomment-576493693
+    """
+    s, _, v = tf.linalg.svd(tensor)
+
+    # Remove singular values which are smaller than a threshold, for numerical
+    # stability (?). This is done by truncating components common across the
+    # batch that are below a threshold, and zeroing out the other components
+    # below the threshold.
+    eps = tf.keras.backend.epsilon()
+    threshold = tf.math.reduce_max(s, -1, keepdims=True) * s.shape[-1] * eps
+    good = s > threshold
+    components = tf.math.reduce_sum(tf.cast(good, tf.int64), -1)
+    common = tf.math.reduce_max(components)
+    unbalanced = common != tf.math.reduce_min(components)
+
+    if common < s.shape[-1]:
+        s = s[..., :common]
+        v = v[..., :common]
+        if unbalanced:
+            good = good[..., :common]
+
+    if unbalanced:
+        s = tf.where(good, s, 0)
+
+    # Compose the square root matrix
+    v_dims = len(v.shape)
+    v_t = tf.transpose(v, list(range(v_dims - 2)) + [v_dims - 1, v_dims - 2])
+    return (v * tf.expand_dims(tf.math.sqrt(s), -2)) @ v_t
+
+
+@tf.function
 def get_grid(img: Tensor) -> Tensor:
     """Convert a batch of float images from [-1, 1] to a uint8 image grid.
 

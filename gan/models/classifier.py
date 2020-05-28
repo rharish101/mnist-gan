@@ -14,7 +14,13 @@ from tensorflow.keras.regularizers import l2
 
 
 class Classifier(Model):
-    """The image classifier model."""
+    """The image classifier model.
+
+    Attributes:
+        weight_decay: The decay for L2 regularization
+        feature_extract: The feature extraction layers
+        final: The final classification layers
+    """
 
     def __init__(
         self,

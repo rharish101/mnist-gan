@@ -17,7 +17,21 @@ from ..utils import get_grid, wasserstein_gradient_penalty
 
 
 class GANTrainer:
-    """Class to train an MNIST GAN."""
+    """Class to train an MNIST GAN.
+
+    Attributes:
+        generator: The generator model being trained
+        critic: The critic model being trained
+        train_dataset: The dataset of real images and labels for training
+        val_dataset: The dataset of real images and labels for validation
+        gen_optim: The optimizer for the generator
+        crit_optim: The optimizer for the critic
+        evaluator: The object that calculates the running FID
+        writer: The summary writer to log TensorBoard summaries
+        noise_dims: The dimensions for the inputs to the generator
+        gp_weight: Weights for the critic's gradient penalty
+        save_dir: Directory where to store model weights
+    """
 
     GEN_PATH: Final[str] = "generator.ckpt"
     CRIT_PATH: Final[str] = "critic.ckpt"

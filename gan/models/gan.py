@@ -76,6 +76,10 @@ class Conditioning(Layer):
     This layer conditions with the class labels. An embedding layer is used for
     the class labels without passing through a dense layer as the no. of
     classes is smaller than typical embedding sizes.
+
+    Attributes:
+        weight_decay: The decay for L2 regularization
+        embed: The core embedding layer
     """
 
     def __init__(self, weight_decay: float) -> None:

@@ -14,6 +14,9 @@ class RunningFID:
     This is helpful when FID is to be calculated over more examples than can
     be stored in memory at once. This also provides a classmethod to directly
     compute the FID without keeping running metrics.
+
+    Attributes:
+        classifier: The pre-trained classifier model
     """
 
     def __init__(self, classifier: Model) -> None:

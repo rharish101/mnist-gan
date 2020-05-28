@@ -11,7 +11,11 @@ from typing_extensions import Final
 
 
 class ClassifierTrainer:
-    """Class for training the classifier."""
+    """Class for training the classifier.
+
+    Attributes:
+        model: The classifier model being trained
+    """
 
     CLS_PATH: Final[str] = "classifier.ckpt"
 

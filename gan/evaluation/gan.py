@@ -7,13 +7,18 @@ from tqdm import tqdm
 
 
 class GANEvaluator:
-    """Class to generate images using an MNIST GAN."""
+    """Class to generate images using an MNIST GAN.
+
+    Attributes:
+        generator: The generator model to be evaluated
+        noise_dims: The dimensions for the inputs to the generator
+    """
 
     def __init__(self, generator: Model, noise_dims: int) -> None:
         """Store the required objects and info.
 
         Args:
-            generator: The generator model to be trained
+            generator: The generator model to be evaluated
             noise_dims: The dimensions for the inputs to the generator
         """
         self.generator = generator

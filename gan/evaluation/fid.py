@@ -1,8 +1,8 @@
 """Class for calculating FID."""
-from typing import Dict, Tuple
+from typing import Dict
 
 import tensorflow as tf
-from tensorflow import Tensor
+from tensorflow import Tensor, Variable
 from tensorflow.keras import Model
 
 from ..utils import sqrtm
@@ -26,30 +26,40 @@ class RunningFID:
             classifier: The pre-trained classifier model
         """
         self.classifier = classifier
-        self.reset()  # used to initialize the running metrics
 
-    def reset(self) -> None:
-        """Reset the running metrics."""
+        # The initial values will be used for resetting the running metrics
+        num_features = classifier.feature_extract.output_shape[-1]
+        self._init_mean = tf.zeros([num_features], dtype=tf.float64)
+        self._init_cov = tf.zeros(
+            [num_features, num_features], dtype=tf.float64
+        )
+        self._init_num = tf.constant(0, dtype=tf.float64)
+
         # The running metrics are the mean and covariance for the Gaussian
         # distribution along with the total number of examples.
-        self._mean: Dict[str, Tensor] = {
-            "real": tf.zeros([], dtype=tf.float64),
-            "gen": tf.zeros([], dtype=tf.float64),
+        self._mean: Dict[str, Variable] = {
+            kind: Variable(self._init_mean, trainable=False)
+            for kind in ("real", "gen")
         }
-        self._cov: Dict[str, Tensor] = {
-            "real": tf.zeros([], dtype=tf.float64),
-            "gen": tf.zeros([], dtype=tf.float64),
+        self._cov: Dict[str, Variable] = {
+            kind: Variable(self._init_cov, trainable=False)
+            for kind in ("real", "gen")
         }
-        self._total_num: Dict[str, Tensor] = {
-            "real": tf.zeros([], dtype=tf.float64),
-            "gen": tf.zeros([], dtype=tf.float64),
+        self._total_num: Dict[str, Variable] = {
+            kind: Variable(self._init_num, trainable=False)
+            for kind in ("real", "gen")
         }
 
     @tf.function
-    def _get_updated_metrics(
-        self, feat: Tensor, kind: str
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Get the updated values of the running metrics.
+    def reset(self) -> None:
+        """Reset the running metrics."""
+        for kind in "real", "gen":
+            self._mean[kind].assign(self._init_mean)
+            self._cov[kind].assign(self._init_cov)
+            self._total_num[kind].assign(self._init_num)
+
+    def _update_metrics(self, feat: Tensor, kind: str) -> None:
+        """Update the values of the running metrics.
 
         The running metrics here are the mean, the covariance, and the total
         number of examples.
@@ -60,11 +70,6 @@ class RunningFID:
         Args:
             feat: The batch of 1D features
             kind: The kind of metrics to use. Must be one of: ["real", "gen"]
-
-        Returns:
-            The updated running mean
-            The updated running covariance
-            The updated total number of examples
         """
         # Notation for the following comments:
         # Shapes: B: batch_size, D: dimensions
@@ -92,8 +97,11 @@ class RunningFID:
         cov_update = tf.transpose(feat - old_mean) @ (feat - new_mean)
         new_cov = old_cov + (cov_update - num * old_cov) / new_num
 
-        return new_mean, new_cov, new_num
+        self._mean[kind].assign(new_mean)
+        self._cov[kind].assign(new_cov)
+        self._total_num[kind].assign(new_num)
 
+    @tf.function
     def update(self, real: Tensor, generated: Tensor) -> None:
         """Update the running metrics with the given info.
 
@@ -109,10 +117,7 @@ class RunningFID:
         for kind in features:
             # Cast to float64 for higher accuracy
             feat = tf.cast(features[kind], tf.float64)
-            updates = self._get_updated_metrics(feat, kind)
-            self._mean[kind] = updates[0]
-            self._cov[kind] = updates[1]
-            self._total_num[kind] = updates[2]
+            self._update_metrics(feat, kind)
 
     @tf.function
     def get_fid(self) -> Tensor:

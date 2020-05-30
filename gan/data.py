@@ -1,4 +1,5 @@
 """Data loading utilities for the MNIST GAN."""
+import itertools
 import os
 from typing import BinaryIO, Dict, List, Tuple, Type
 
@@ -79,19 +80,18 @@ def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
     prefixes: Dict[str, str] = {"train": "train", "test": "t10k"}
     infixes: Dict[str, str] = {"images": "3", "labels": "1"}
 
-    for mode in prefixes:
-        for data in infixes:
-            filename = f"{prefixes[mode]}-{data}-idx{infixes[data]}-ubyte"
-            data_path = os.path.join(mnist_path, filename)
+    for mode, data in itertools.product(prefixes, infixes):
+        filename = f"{prefixes[mode]}-{data}-idx{infixes[data]}-ubyte"
+        data_path = os.path.join(mnist_path, filename)
 
-            print(f"\rLoading {mode} {data}...", end="")
-            if os.path.exists(data_path):  # decompressed dataset
-                with open(data_path, "rb") as idx:
-                    dataset[mode][data] = _load_idx(idx)
-            else:
-                raise FileNotFoundError(
-                    f'MNIST dataset file "{data_path}" not found.'
-                )
+        print(f"\rLoading {mode} {data}...", end="")
+        if os.path.exists(data_path):  # decompressed dataset
+            with open(data_path, "rb") as idx:
+                dataset[mode][data] = _load_idx(idx)
+        else:
+            raise FileNotFoundError(
+                f'MNIST dataset file "{data_path}" not found.'
+            )
 
     print("\rLoaded MNIST dataset successfully")
 

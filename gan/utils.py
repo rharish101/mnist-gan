@@ -19,13 +19,14 @@ def wasserstein_gradient_penalty(
     Args:
         inputs: The inputs for the critic
         outputs: The critic's outputs for the above inputs
-        tape: The persistent gradient tape for calculating gradients
+        tape: The gradient tape for calculating gradients
 
     Returns:
         The gradient penalty loss
     """
     grads = tape.gradient(outputs, inputs)
-    norm = tf.sqrt(tf.reduce_sum(grads ** 2, axis=1))
+    # Get norm for each item in the batch
+    norm = tf.norm(grads, axis=range(1, len(grads.shape)))
     penalty = tf.reduce_mean((norm - 1) ** 2)
     return penalty
 

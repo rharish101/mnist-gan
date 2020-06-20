@@ -51,6 +51,7 @@ def main(args: Namespace) -> None:
         save_dir=args.save_dir,
     )
     trainer.train(
+        disc_steps=args.disc_steps,
         epochs=args.epochs,
         record_steps=args.record_steps,
         save_steps=args.save_steps,
@@ -103,6 +104,12 @@ if __name__ == "__main__":
         type=float,
         default=2.5e-5,
         help="L2 weight decay rate",
+    )
+    parser.add_argument(
+        "--disc-steps",
+        type=int,
+        default=1,
+        help="the number of discriminator steps per generator step",
     )
     parser.add_argument(
         "--epochs",

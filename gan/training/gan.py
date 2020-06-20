@@ -86,7 +86,7 @@ class GANTrainer:
 
     @tf.function
     def train_step(
-        self, real: Tensor, labels: Tensor
+        self, real: Tensor, labels: Tensor, train_gen: bool = True
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
         """Run a single training step.
 
@@ -95,6 +95,7 @@ class GANTrainer:
         Args:
             real: The input real images
             labels: The corresponding input labels
+            train_gen: Whether to train the generator
 
         Returns:
             The generated images
@@ -136,10 +137,13 @@ class GANTrainer:
             zip(crit_grads, self.critic.trainable_variables)
         )
 
-        gen_grads = tape.gradient(gen_loss, self.generator.trainable_variables)
-        self.gen_optim.apply_gradients(
-            zip(gen_grads, self.generator.trainable_variables)
-        )
+        if train_gen:
+            gen_grads = tape.gradient(
+                gen_loss, self.generator.trainable_variables
+            )
+            self.gen_optim.apply_gradients(
+                zip(gen_grads, self.generator.trainable_variables)
+            )
 
         # Losses required for logging summaries
         losses = {
@@ -235,10 +239,13 @@ class GANTrainer:
             for j in inner:
                 yield i, j
 
-    def train(self, epochs: int, record_steps: int, save_steps: int) -> None:
+    def train(
+        self, disc_steps: int, epochs: int, record_steps: int, save_steps: int
+    ) -> None:
         """Execute the training loops for the GAN.
 
         Args:
+            disc_steps: The number of discriminator steps per generator step
             epochs: Number of epochs to train the GAN
             record_steps: Step interval for recording summaries
             save_steps: Step interval for saving the model
@@ -254,6 +261,14 @@ class GANTrainer:
             total=epochs * total_batches,
             desc="Training",
         ):
+            # XXX: Run a single step to initialize all optimizer variables.
+            # This is a workaround for TensorFlow issue here:
+            # https://github.com/tensorflow/tensorflow/issues/27120
+            if global_step == 1:
+                self.train_step(real, lbls)
+
+            for _ in range(disc_steps - 1):
+                self.train_step(real, lbls, train_gen=False)
             gen, losses = self.train_step(real, lbls)
 
             if global_step % record_steps == 0:

@@ -84,6 +84,25 @@ class GANTrainer:
 
         self.save_dir = save_dir
 
+    def _init_optim(self) -> None:
+        """Initialize the optimizer variables.
+
+        This is needed because TensorFlow doesn't allow variable creation after
+        `tf.function`'s graph has been traced once. This is a workaround for
+        the TensorFlow issue here:
+        https://github.com/tensorflow/tensorflow/issues/27120
+        """
+        for model, optim in [
+            (self.generator, self.gen_optim),
+            (self.critic, self.crit_optim),
+        ]:
+            # The optimizer will initialize its variables only on applying
+            # gradients. Therefore, we use zero grads.
+            grads_and_vars = [
+                (tf.zeros_like(var), var) for var in model.trainable_variables
+            ]
+            optim.apply_gradients(grads_and_vars)
+
     @tf.function
     def train_step(
         self, real: Tensor, labels: Tensor, train_gen: bool = True
@@ -252,21 +271,17 @@ class GANTrainer:
         """
         # Total no. of batches in the training dataset
         total_batches = cardinality(self.train_dataset).numpy()
-
         # Iterate over dataset in epochs
         data_in_epochs = self._nested_loops(range(epochs), self.train_dataset)
+
+        # Initialize all optimizer variables
+        self._init_optim()
 
         for global_step, (_, (real, lbls)) in tqdm(
             enumerate(data_in_epochs, 1),
             total=epochs * total_batches,
             desc="Training",
         ):
-            # XXX: Run a single step to initialize all optimizer variables.
-            # This is a workaround for TensorFlow issue here:
-            # https://github.com/tensorflow/tensorflow/issues/27120
-            if global_step == 1:
-                self.train_step(real, lbls)
-
             for _ in range(disc_steps - 1):
                 self.train_step(real, lbls, train_gen=False)
             gen, losses = self.train_step(real, lbls)

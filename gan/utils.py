@@ -25,8 +25,8 @@ def wasserstein_gradient_penalty(
         The gradient penalty loss
     """
     grads = tape.gradient(outputs, inputs)
-    # Get norm for each item in the batch
-    norm = tf.norm(grads, axis=range(1, len(grads.shape)))
+    flat_grads = tf.reshape(grads, (grads.shape[0], -1))
+    norm = tf.norm(flat_grads, axis=1)
     penalty = tf.reduce_mean((norm - 1) ** 2)
     return penalty
 

@@ -82,7 +82,7 @@ class Conditioning(Layer):
         embed: The core embedding layer
     """
 
-    def __init__(self, weight_decay: float) -> None:
+    def __init__(self, weight_decay: float):
         """Store weight decay."""
         super().__init__()
         self.weight_decay = weight_decay

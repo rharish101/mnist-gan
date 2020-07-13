@@ -19,7 +19,7 @@ class RunningFID:
         classifier: The pre-trained classifier model
     """
 
-    def __init__(self, classifier: Model) -> None:
+    def __init__(self, classifier: Model):
         """Initialize the running metrics and store the classifier.
 
         Args:

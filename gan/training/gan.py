@@ -51,7 +51,7 @@ class GANTrainer:
         gp_weight: float,
         log_dir: str,
         save_dir: str,
-    ) -> None:
+    ):
         """Store main models and info required for training.
 
         Args:

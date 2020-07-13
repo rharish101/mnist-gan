@@ -14,7 +14,7 @@ class GANEvaluator:
         noise_dims: The dimensions for the inputs to the generator
     """
 
-    def __init__(self, generator: Model, noise_dims: int) -> None:
+    def __init__(self, generator: Model, noise_dims: int):
         """Store the required objects and info.
 
         Args:

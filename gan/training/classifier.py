@@ -19,7 +19,7 @@ class ClassifierTrainer:
 
     CLS_PATH: Final[str] = "classifier.ckpt"
 
-    def __init__(self, model: Model, lr: float) -> None:
+    def __init__(self, model: Model, lr: float):
         """Store the main model and other required info.
 
         Args:

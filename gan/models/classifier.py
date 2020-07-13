@@ -27,7 +27,7 @@ class Classifier(Model):
         input_shape: Tuple[int, int, int],
         num_classes: int,
         weight_decay: float = 2.5e-5,
-    ) -> None:
+    ):
         """Initialize all intermediate layers.
 
         Args:

@@ -1,7 +1,7 @@
 """Data loading utilities for the MNIST GAN."""
 import itertools
 import os
-from typing import BinaryIO, Dict, List, Tuple, Type
+from typing import BinaryIO, Dict, List, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -9,11 +9,11 @@ from tensorflow import Tensor
 from tensorflow.data import Dataset
 from typing_extensions import Final
 
-NUM_CLS: Final[int] = 10  # number of classes in MNIST
-IMG_SIZE: Final[Tuple[int, int]] = (64, 64)  # images will be resized to this
+NUM_CLS: Final = 10  # number of classes in MNIST
+IMG_SIZE: Final = (64, 64)  # images will be resized to this
 
 # Map the size as found in IDX files to their respective numpy dtypes
-SIZE_TO_DTYPE: Final[Dict[int, Type[np.number]]] = {
+SIZE_TO_DTYPE: Final = {
     8: np.uint8,
     9: np.int8,
     11: np.int16,

@@ -9,7 +9,7 @@ from gan.models import Classifier
 from gan.training import ClassifierTrainer
 from gan.utils import setup_dirs
 
-CONFIG: Final[str] = "config-cls.yaml"
+CONFIG: Final = "config-cls.yaml"
 
 
 def main(args: Namespace) -> None:

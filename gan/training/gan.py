@@ -31,8 +31,8 @@ class GANTrainer:
         save_dir: Directory where to store model weights
     """
 
-    GEN_PATH: Final[str] = "generator.ckpt"
-    CRIT_PATH: Final[str] = "critic.ckpt"
+    GEN_PATH: Final = "generator.ckpt"
+    CRIT_PATH: Final = "critic.ckpt"
 
     def __init__(
         self,

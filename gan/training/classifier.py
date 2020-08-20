@@ -16,7 +16,7 @@ class ClassifierTrainer:
         model: The classifier model being trained
     """
 
-    CLS_PATH: Final[str] = "classifier.ckpt"
+    CLS_PATH: Final = "classifier.ckpt"
 
     def __init__(self, model: Model, lr: float):
         """Store the main model and other required info.

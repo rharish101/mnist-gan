@@ -1,7 +1,6 @@
 """Class for training a classifier for FID."""
 import os
 
-import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
@@ -55,7 +54,7 @@ class ClassifierTrainer:
             save_steps: Step interval for saving the model
         """
         # Total no. of batches in the dataset
-        dataset_size = tf.data.experimental.cardinality(train_dataset).numpy()
+        dataset_size = train_dataset.cardinality().numpy()
 
         logger = TensorBoard(
             log_dir=log_dir,

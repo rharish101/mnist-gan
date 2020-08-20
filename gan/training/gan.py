@@ -5,7 +5,6 @@ from typing import Dict, Tuple
 import tensorflow as tf
 from tensorflow import Tensor
 from tensorflow.data import Dataset
-from tensorflow.data.experimental import cardinality
 from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
@@ -254,7 +253,7 @@ class GANTrainer:
             save_steps: Step interval for saving the model
         """
         # Total no. of batches in the training dataset
-        total_batches = cardinality(self.train_dataset).numpy()
+        total_batches = self.train_dataset.cardinality().numpy()
         # Iterate over dataset in epochs
         data_in_epochs = iterator_product(range(epochs), self.train_dataset)
 

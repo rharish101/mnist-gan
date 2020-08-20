@@ -1,6 +1,6 @@
 """Class for training the GAN."""
 import os
-from typing import Dict, Iterable, Tuple, TypeVar
+from typing import Dict, Tuple
 
 import tensorflow as tf
 from tensorflow import Tensor
@@ -12,10 +12,7 @@ from tqdm import tqdm
 from typing_extensions import Final
 
 from ..evaluation import RunningFID
-from ..utils import get_grid, wasserstein_gradient_penalty
-
-_OuterLoopType = TypeVar("_OuterLoopType")
-_InnerLoopType = TypeVar("_InnerLoopType")
+from ..utils import get_grid, iterator_product, wasserstein_gradient_penalty
 
 
 class GANTrainer:
@@ -245,19 +242,6 @@ class GANTrainer:
         ]:
             model.save_weights(os.path.join(self.save_dir, file_name))
 
-    @staticmethod
-    def _nested_loops(
-        outer: Iterable[_OuterLoopType], inner: Iterable[_InnerLoopType]
-    ) -> Iterable[Tuple[_OuterLoopType, _InnerLoopType]]:
-        """A nested loop generator.
-
-        This works similar to `itertools.product`, but without duplicating
-        stuff in memory. This notably happens when using TensorFlow datasets.
-        """
-        for i in outer:
-            for j in inner:
-                yield i, j
-
     def train(
         self, disc_steps: int, epochs: int, record_steps: int, save_steps: int
     ) -> None:
@@ -272,7 +256,7 @@ class GANTrainer:
         # Total no. of batches in the training dataset
         total_batches = cardinality(self.train_dataset).numpy()
         # Iterate over dataset in epochs
-        data_in_epochs = self._nested_loops(range(epochs), self.train_dataset)
+        data_in_epochs = iterator_product(range(epochs), self.train_dataset)
 
         # Initialize all optimizer variables
         self._init_optim()

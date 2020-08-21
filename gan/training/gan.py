@@ -99,9 +99,8 @@ class GANTrainer:
             ]
             optim.apply_gradients(grads_and_vars)
 
-    @tf.function
     def train_step(
-        self, real: Tensor, labels: Tensor, train_gen: bool = True
+        self, real: Tensor, labels: Tensor, train_gen: bool
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
         """Run a single training step.
 
@@ -110,7 +109,7 @@ class GANTrainer:
         Args:
             real: The input real images
             labels: The corresponding input labels
-            train_gen: Whether to train the generator
+            train_gen: Whether to train the generator or train the critic
 
         Returns:
             The generated images
@@ -147,18 +146,17 @@ class GANTrainer:
             )
             crit_loss = -wass_loss + crit_reg + self.gp_weight * grad_pen
 
-        crit_grads = tape.gradient(crit_loss, self.critic.trainable_variables)
-        self.crit_optim.apply_gradients(
-            zip(crit_grads, self.critic.trainable_variables)
-        )
-
         if train_gen:
-            gen_grads = tape.gradient(
-                gen_loss, self.generator.trainable_variables
-            )
-            self.gen_optim.apply_gradients(
-                zip(gen_grads, self.generator.trainable_variables)
-            )
+            train_vars = self.generator.trainable_variables
+            loss = gen_loss
+            optim = self.gen_optim
+        else:
+            train_vars = self.critic.trainable_variables
+            loss = crit_loss
+            optim = self.crit_optim
+
+        grads = tape.gradient(loss, train_vars)
+        optim.apply_gradients(zip(grads, train_vars))
 
         # Losses required for logging summaries
         losses = {
@@ -260,14 +258,27 @@ class GANTrainer:
         # Initialize all optimizer variables
         self._init_optim()
 
+        # We use the argument `train_gen`, a boolean, to change the graph for
+        # training either the generator or the discriminator. `tf.function`
+        # will retrace every time when used as a decorator, so we manually
+        # create the two separate graphs to avoid retracing. The retracing for
+        # the graphs of different stages happen rarely, so there's no need to
+        # create separate graphs for them.
+        gen_train_step = tf.function(
+            lambda real, lbl: self.train_step(real, lbl, train_gen=True)
+        )
+        disc_train_step = tf.function(
+            lambda real, lbl: self.train_step(real, lbl, train_gen=False)
+        )
+
         for global_step, (_, (real, lbls)) in tqdm(
             enumerate(data_in_epochs, 1),
             total=epochs * total_batches,
             desc="Training",
         ):
-            for _ in range(disc_steps - 1):
-                self.train_step(real, lbls, train_gen=False)
-            gen, losses = self.train_step(real, lbls)
+            for _ in range(disc_steps):
+                disc_train_step(real, lbls)
+            gen, losses = gen_train_step(real, lbls)
 
             if global_step % record_steps == 0:
                 self.log_summaries(

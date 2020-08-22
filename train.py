@@ -62,6 +62,7 @@ def main(args: Namespace) -> None:
     trainer.train(
         epochs=args.epochs,
         record_steps=args.record_steps,
+        log_graph=args.log_graph,
         save_steps=args.save_steps,
     )
 
@@ -148,6 +149,11 @@ if __name__ == "__main__":
         type=int,
         default=500,
         help="the frequency of recording summaries (in steps)",
+    )
+    parser.add_argument(
+        "--log-graph",
+        action="store_true",
+        help="whether to log the graph of the model",
     )
     parser.add_argument(
         "--log-dir",

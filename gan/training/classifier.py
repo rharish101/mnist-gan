@@ -45,6 +45,7 @@ class ClassifierTrainer:
         record_eps: int,
         save_dir: str,
         save_steps: int,
+        log_graph: bool = False,
     ) -> None:
         """Execute the training loops for the classifier.
 
@@ -56,13 +57,14 @@ class ClassifierTrainer:
             record_eps: Epoch interval for recording summaries
             save_dir: Directory where to store model weights
             save_steps: Step interval for saving the model
+            log_graph: Whether to log the graph of the model
         """
         # Total no. of batches in the dataset
         dataset_size = train_dataset.cardinality().numpy()
 
         logger = TensorBoard(
             log_dir=log_dir,
-            write_graph=False,
+            write_graph=log_graph,
             update_freq=record_eps * dataset_size,
             profile_batch=0,
         )

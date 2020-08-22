@@ -48,6 +48,7 @@ def main(args: Namespace) -> None:
         record_eps=args.record_eps,
         save_dir=args.save_dir,
         save_steps=args.save_steps,
+        log_graph=args.log_graph,
     )
 
 
@@ -103,6 +104,11 @@ if __name__ == "__main__":
         type=int,
         default=5,
         help="the frequency of recording summaries (in epochs)",
+    )
+    parser.add_argument(
+        "--log-graph",
+        action="store_true",
+        help="whether to log the graph of the model",
     )
     parser.add_argument(
         "--log-dir",

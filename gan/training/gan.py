@@ -321,13 +321,20 @@ class GANTrainer:
         ]:
             model.save_weights(os.path.join(self.save_dir, file_name))
 
-    def train(self, epochs: int, record_steps: int, save_steps: int) -> None:
+    def train(
+        self,
+        epochs: int,
+        record_steps: int,
+        save_steps: int,
+        log_graph: bool = False,
+    ) -> None:
         """Execute the training loops for the GAN.
 
         Args:
             epochs: Number of epochs to train the GAN
             record_steps: Step interval for recording summaries
             save_steps: Step interval for saving the model
+            log_graph: Whether to log the graph of the model
         """
         # Total no. of batches in the training dataset
         total_batches = self.train_dataset.cardinality().numpy()
@@ -345,7 +352,16 @@ class GANTrainer:
             total=epochs * total_batches,
             desc="Training",
         ):
+            # The graph must be exported the first time the tf.function is run,
+            # otherwise the graph is empty.
+            if global_step == 1 and log_graph:
+                tf.summary.trace_on()
+
             gen, losses = self.train_step(real, lbls)
+
+            if global_step == 1 and log_graph:
+                with self.writer.as_default():
+                    tf.summary.trace_export("gan_step", step=global_step)
 
             if global_step % record_steps == 0:
                 self.log_summaries(

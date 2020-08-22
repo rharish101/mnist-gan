@@ -19,6 +19,8 @@ class GANTrainer:
     """Class to train an MNIST GAN.
 
     Attributes:
+        GEN_PATH: The prefix for the file name of the generator's saved weights
+        CRIT_PATH: The prefix for the file name of the critic's saved weights
         generator: The generator model being trained
         critic: The critic model being trained
         train_dataset: The dataset of real images and labels for training
@@ -27,6 +29,8 @@ class GANTrainer:
         crit_optim: The optimizer for the critic
         evaluator: The object that calculates the running FID
         writer: The summary writer to log TensorBoard summaries
+        batch_size: The global batch size
+        crit_steps: The number of critic steps per generator step
         noise_dims: The dimensions for the inputs to the generator
         gp_weight: Weights for the critic's gradient penalty
         save_dir: Directory where to store model weights

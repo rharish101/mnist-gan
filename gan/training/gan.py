@@ -44,7 +44,7 @@ class GANTrainer:
         train_dataset: Dataset,
         val_dataset: Dataset,
         batch_size: int,
-        disc_steps: int,
+        crit_steps: int,
         noise_dims: int,
         gen_lr: float,
         crit_lr: float,
@@ -62,7 +62,7 @@ class GANTrainer:
             train_dataset: The dataset of real images and labels for training
             val_dataset: The dataset of real images and labels for validation
             batch_size: The global batch size
-            disc_steps: The number of critic steps per generator step
+            crit_steps: The number of critic steps per generator step
             noise_dims: The dimensions for the inputs to the generator
             gen_lr: The learning rate for the generator's optimizer
             crit_lr: The learning rate for the critic's optimizer
@@ -86,7 +86,7 @@ class GANTrainer:
         self.writer = tf.summary.create_file_writer(log_dir)
 
         self.batch_size = batch_size
-        self.disc_steps = disc_steps
+        self.crit_steps = crit_steps
         self.noise_dims = noise_dims
         self.gp_weight = gp_weight
 
@@ -232,7 +232,7 @@ class GANTrainer:
             The generated images
             The dictionary of losses, as required by `log_summaries`
         """
-        for _ in range(self.disc_steps):
+        for _ in range(self.crit_steps):
             self.strategy.run(self._train_step, args=(real, labels, False))
         gen, losses = self.strategy.run(
             self._train_step, args=(real, labels, True)

@@ -51,7 +51,7 @@ def main(args: Namespace) -> None:
         train_dataset,
         test_dataset,
         batch_size=args.batch_size,
-        disc_steps=args.disc_steps,
+        crit_steps=args.crit_steps,
         noise_dims=args.noise_dims,
         gen_lr=args.gen_lr,
         crit_lr=args.crit_lr,
@@ -114,10 +114,10 @@ if __name__ == "__main__":
         help="L2 weight decay rate",
     )
     parser.add_argument(
-        "--disc-steps",
+        "--crit-steps",
         type=int,
         default=1,
-        help="the number of discriminator steps per generator step",
+        help="the number of critic steps per generator step",
     )
     parser.add_argument(
         "--epochs",

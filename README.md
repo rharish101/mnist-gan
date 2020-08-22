@@ -4,7 +4,8 @@ This is a repository for training a [conditional GAN](https://arxiv.org/abs/1411
 The GAN is optimized using the [Wasserstein loss](https://arxiv.org/abs/1701.07875) and the [Wasserstein gradient penalty](https://arxiv.org/abs/1704.00028).
 A [DCGAN-like](https://arxiv.org/abs/1511.06434) architecture is used along with [spectral normalization](https://arxiv.org/abs/1802.05957) for the critic.
 
-This requires Python 3.6+.
+This implementation requires Python 3.6+.
+This supports multi-GPU training on a single machine using TensorFlow's [`tf.distribute.MirroredStrategy`](https://www.tensorflow.org/tutorials/distribute/custom_training#create_a_strategy_to_distribute_the_variables_and_the_graph).
 
 ## Instructions
 

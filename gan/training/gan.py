@@ -5,13 +5,14 @@ from typing import Dict, Tuple
 import tensorflow as tf
 from tensorflow import Tensor
 from tensorflow.data import Dataset
+from tensorflow.distribute import ReduceOp, Strategy
 from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 from typing_extensions import Final
 
 from ..evaluation import RunningFID
-from ..utils import get_grid, iterator_product
+from ..utils import get_grid, iterator_product, reduce_concat
 
 
 class GANTrainer:
@@ -39,8 +40,10 @@ class GANTrainer:
         generator: Model,
         critic: Model,
         classifier: Model,
+        strategy: Strategy,
         train_dataset: Dataset,
         val_dataset: Dataset,
+        batch_size: int,
         noise_dims: int,
         gen_lr: float,
         crit_lr: float,
@@ -54,8 +57,10 @@ class GANTrainer:
             generator: The generator model to be trained
             critic: The critic model to be trained
             classifier: The trained classifier model for FID
+            strategy: The distribution strategy for training the GAN
             train_dataset: The dataset of real images and labels for training
             val_dataset: The dataset of real images and labels for validation
+            batch_size: The global batch size
             noise_dims: The dimensions for the inputs to the generator
             gen_lr: The learning rate for the generator's optimizer
             crit_lr: The learning rate for the critic's optimizer
@@ -66,20 +71,25 @@ class GANTrainer:
         self.generator = generator
         self.critic = critic
 
+        self.strategy = strategy
+
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
 
-        self.gen_optim = Adam(gen_lr, 0.5)
-        self.crit_optim = Adam(crit_lr, 0.5)
+        with strategy.scope():
+            self.gen_optim = Adam(gen_lr, 0.5)
+            self.crit_optim = Adam(crit_lr, 0.5)
 
         self.evaluator = RunningFID(classifier)
         self.writer = tf.summary.create_file_writer(log_dir)
 
+        self.batch_size = batch_size
         self.noise_dims = noise_dims
         self.gp_weight = gp_weight
 
         self.save_dir = save_dir
 
+    @tf.function
     def _init_optim(self) -> None:
         """Initialize the optimizer variables.
 
@@ -88,16 +98,21 @@ class GANTrainer:
         the TensorFlow issue here:
         https://github.com/tensorflow/tensorflow/issues/27120
         """
-        for model, optim in [
-            (self.generator, self.gen_optim),
-            (self.critic, self.crit_optim),
-        ]:
-            # The optimizer will initialize its variables only on applying
-            # gradients. Therefore, we use zero grads.
-            grads_and_vars = [
-                (tf.zeros_like(var), var) for var in model.trainable_variables
-            ]
-            optim.apply_gradients(grads_and_vars)
+
+        def create_vars():
+            for model, optim in [
+                (self.generator, self.gen_optim),
+                (self.critic, self.crit_optim),
+            ]:
+                # The optimizer will initialize its variables only on applying
+                # gradients. Therefore, we use zero grads.
+                grads_and_vars = [
+                    (tf.zeros_like(var), var)
+                    for var in model.trainable_variables
+                ]
+                optim.apply_gradients(grads_and_vars)
+
+        self.strategy.run(create_vars, args=tuple())
 
     def _gradient_penalty(
         self, real: Tensor, generated: Tensor, labels: Tensor
@@ -128,24 +143,14 @@ class GANTrainer:
         flat_grads = tf.reshape(grads, (grads.shape[0], -1))
         norm = tf.norm(flat_grads, axis=1)
         gp_batch = (norm - 1) ** 2
-        return tf.reduce_mean(gp_batch)
+        return tf.nn.compute_average_loss(
+            gp_batch, global_batch_size=self.batch_size
+        )
 
-    def train_step(
+    def _train_step(
         self, real: Tensor, labels: Tensor, train_gen: bool
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
-        """Run a single training step.
-
-        The returned dict of losses are used for logging summaries.
-
-        Args:
-            real: The input real images
-            labels: The corresponding input labels
-            train_gen: Whether to train the generator or train the critic
-
-        Returns:
-            The generated images
-            dict: The dictionary of losses, as required by `log_summaries`
-        """
+        """Run a single training step on a single GPU."""
         noise = tf.random.normal((real.get_shape()[0], self.noise_dims))
 
         with tf.GradientTape(persistent=True) as tape:
@@ -155,13 +160,22 @@ class GANTrainer:
             crit_fake_out = self.critic([generated, labels], training=True)
 
             # Wasserstein distance
-            wass_loss = tf.reduce_mean(crit_real_out - crit_fake_out)
-
-            gen_reg = sum(self.generator.losses)
-            gen_loss = wass_loss + gen_reg
-
-            crit_reg = sum(self.critic.losses)
+            wass_loss = tf.nn.compute_average_loss(
+                crit_real_out - crit_fake_out,
+                global_batch_size=self.batch_size,
+            )
+            # Wasserstein Gradient Penalty
             grad_pen = self._gradient_penalty(real, generated, labels)
+
+            # Regularization losses
+            # NOTE: Regularization needs to be scaled by the number of GPUs in
+            # the strategy, as gradients will be added.
+            gen_reg = tf.nn.scale_regularization_loss(
+                sum(self.generator.losses)
+            )
+            crit_reg = tf.nn.scale_regularization_loss(sum(self.critic.losses))
+
+            gen_loss = wass_loss + gen_reg
             crit_loss = -wass_loss + crit_reg + self.gp_weight * grad_pen
 
         if train_gen:
@@ -186,6 +200,35 @@ class GANTrainer:
 
         # Returned values are used for logging summaries
         return generated, losses
+
+    def train_step(
+        self, real: Tensor, labels: Tensor, train_gen: bool
+    ) -> Tuple[Tensor, Dict[str, Tensor]]:
+        """Run a single training step, distributing across all GPUs.
+
+        The returned dict of losses are used for logging summaries.
+
+        Args:
+            real: The input real images
+            labels: The corresponding input labels
+            train_gen: Whether to train the generator or train the critic
+
+        Returns:
+            The generated images
+            The dictionary of losses, as required by `log_summaries`
+        """
+        gen, losses = self.strategy.run(
+            self._train_step, args=(real, labels, train_gen)
+        )
+
+        gen = reduce_concat(self.strategy, gen)
+        # Sum losses across all GPUs
+        losses = {
+            key: self.strategy.reduce(ReduceOp.SUM, value, axis=None)
+            for key, value in losses.items()
+        }
+
+        return gen, losses
 
     def _get_fid(self) -> Tensor:
         """Calculate FID over the validation dataset."""
@@ -270,8 +313,11 @@ class GANTrainer:
         """
         # Total no. of batches in the training dataset
         total_batches = self.train_dataset.cardinality().numpy()
+        dataset = self.strategy.experimental_distribute_dataset(
+            self.train_dataset
+        )
         # Iterate over dataset in epochs
-        data_in_epochs = iterator_product(range(epochs), self.train_dataset)
+        data_in_epochs = iterator_product(range(epochs), dataset)
 
         # Initialize all optimizer variables
         self._init_optim()
@@ -300,7 +346,10 @@ class GANTrainer:
 
             if global_step % record_steps == 0:
                 self.log_summaries(
-                    real, gen, losses, global_step,
+                    reduce_concat(self.strategy, real),
+                    gen,
+                    losses,
+                    global_step,
                 )
 
             if global_step % save_steps == 0:

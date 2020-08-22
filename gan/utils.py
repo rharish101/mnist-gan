@@ -2,11 +2,15 @@
 import itertools
 import os
 from datetime import datetime
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Union
 
 import tensorflow as tf
 import yaml
 from tensorflow import Tensor
+from tensorflow.distribute import Strategy
+from tensorflow.python.distribute.values import PerReplica
+
+DistTensor = Union[PerReplica, Tensor]
 
 
 @tf.function
@@ -138,3 +142,21 @@ def iterator_product(*args: Iterable) -> Iterable:
                 yield (i, *j)
             else:
                 yield i, j
+
+
+def reduce_concat(strategy: Strategy, dist_tensor: DistTensor) -> Tensor:
+    """Reduce a distributed tensor by batch-axis concatenation.
+
+    Args:
+        strategy: The multi-device training strategy
+        dist_tensor: The (possibly) replica-distributed tensor
+
+    Returns:
+        The reduced tensor
+    """
+    # If there is only one or zero GPU available, then the values are
+    # proper tensors, so no need to concatenate any values.
+    if strategy.num_replicas_in_sync > 1:
+        return tf.concat(dist_tensor.values, axis=0)
+    else:
+        return dist_tensor

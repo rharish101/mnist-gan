@@ -2,6 +2,7 @@
 """Training a conditional GAN for MNIST."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
+from tensorflow.distribute import MirroredStrategy
 from typing_extensions import Final
 
 from gan.data import NUM_CLS, get_mnist_dataset
@@ -18,16 +19,21 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
+    strategy = MirroredStrategy()
+
     train_dataset, test_dataset = get_mnist_dataset(
         args.mnist_path, args.batch_size
     )
     image_shape = train_dataset.element_spec[0].shape.as_list()[1:]
 
-    generator = get_generator(args.noise_dims, weight_decay=args.weight_decay)
-    critic = get_critic(image_shape, weight_decay=args.weight_decay)
+    with strategy.scope():
+        generator = get_generator(
+            args.noise_dims, weight_decay=args.weight_decay
+        )
+        critic = get_critic(image_shape, weight_decay=args.weight_decay)
 
-    classifier = Classifier(image_shape, NUM_CLS)
-    ClassifierTrainer.load_weights(classifier, args.load_dir)
+        classifier = Classifier(image_shape, NUM_CLS)
+        ClassifierTrainer.load_weights(classifier, args.load_dir)
 
     # Save each run into a directory by its timestamp
     log_dir = setup_dirs(
@@ -41,8 +47,10 @@ def main(args: Namespace) -> None:
         generator,
         critic,
         classifier,
+        strategy,
         train_dataset,
         test_dataset,
+        batch_size=args.batch_size,
         noise_dims=args.noise_dims,
         gen_lr=args.gen_lr,
         crit_lr=args.crit_lr,

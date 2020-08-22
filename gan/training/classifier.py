@@ -2,6 +2,7 @@
 import os
 
 from tensorflow.data import Dataset
+from tensorflow.distribute import Strategy
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
@@ -18,18 +19,21 @@ class ClassifierTrainer:
 
     CLS_PATH: Final = "classifier.ckpt"
 
-    def __init__(self, model: Model, lr: float):
+    def __init__(self, model: Model, strategy: Strategy, lr: float):
         """Store the main model and other required info.
 
         Args:
             model: The classifier model to be trained
+            strategy: The distribution strategy for training the model
             lr: The learning rate for Adam
         """
-        model.compile(
-            optimizer=Adam(lr),
-            loss=SparseCategoricalCrossentropy(from_logits=True),
-            metrics=["accuracy"],
-        )
+        with strategy.scope():
+            model.compile(
+                optimizer=Adam(lr),
+                loss=SparseCategoricalCrossentropy(from_logits=True),
+                metrics=["accuracy"],
+            )
+
         self.model = model
 
     def train(

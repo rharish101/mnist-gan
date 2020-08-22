@@ -2,6 +2,7 @@
 """Training a classifier for FID."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
+from tensorflow.distribute import MirroredStrategy
 from typing_extensions import Final
 
 from gan.data import NUM_CLS, get_mnist_dataset
@@ -18,12 +19,17 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
+    strategy = MirroredStrategy()
+
     train_dataset, test_dataset = get_mnist_dataset(
         args.mnist_path, args.batch_size
     )
     image_shape = train_dataset.element_spec[0].shape.as_list()[1:]
 
-    model = Classifier(image_shape, NUM_CLS, weight_decay=args.weight_decay)
+    with strategy.scope():
+        model = Classifier(
+            image_shape, NUM_CLS, weight_decay=args.weight_decay
+        )
 
     # Save each run into a directory by its timestamp.
     log_dir = setup_dirs(
@@ -33,11 +39,11 @@ def main(args: Namespace) -> None:
         file_name=CONFIG,
     )[0]
 
-    trainer = ClassifierTrainer(model, lr=args.lr)
+    trainer = ClassifierTrainer(model, strategy, lr=args.lr)
     trainer.train(
         train_dataset,
         test_dataset,
-        args.epochs,
+        epochs=args.epochs,
         log_dir=log_dir,
         record_eps=args.record_eps,
         save_dir=args.save_dir,

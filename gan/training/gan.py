@@ -44,6 +44,7 @@ class GANTrainer:
         train_dataset: Dataset,
         val_dataset: Dataset,
         batch_size: int,
+        disc_steps: int,
         noise_dims: int,
         gen_lr: float,
         crit_lr: float,
@@ -61,6 +62,7 @@ class GANTrainer:
             train_dataset: The dataset of real images and labels for training
             val_dataset: The dataset of real images and labels for validation
             batch_size: The global batch size
+            disc_steps: The number of critic steps per generator step
             noise_dims: The dimensions for the inputs to the generator
             gen_lr: The learning rate for the generator's optimizer
             crit_lr: The learning rate for the critic's optimizer
@@ -84,6 +86,7 @@ class GANTrainer:
         self.writer = tf.summary.create_file_writer(log_dir)
 
         self.batch_size = batch_size
+        self.disc_steps = disc_steps
         self.noise_dims = noise_dims
         self.gp_weight = gp_weight
 
@@ -150,7 +153,17 @@ class GANTrainer:
     def _train_step(
         self, real: Tensor, labels: Tensor, train_gen: bool
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
-        """Run a single training step on a single GPU."""
+        """Run a single training step on a single GPU.
+
+        Args:
+            real: The input real images
+            labels: The corresponding input labels
+            train_gen: Whether to train the generator or train the critic
+
+        Returns:
+            The generated images
+            The dictionary of losses, as required by `log_summaries`
+        """
         noise = tf.random.normal((real.get_shape()[0], self.noise_dims))
 
         with tf.GradientTape(persistent=True) as tape:
@@ -201,24 +214,28 @@ class GANTrainer:
         # Returned values are used for logging summaries
         return generated, losses
 
+    @tf.function
     def train_step(
-        self, real: Tensor, labels: Tensor, train_gen: bool
+        self, real: Tensor, labels: Tensor
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
         """Run a single training step, distributing across all GPUs.
 
-        The returned dict of losses are used for logging summaries.
+        This training step will train the critic for the required number of
+        steps as well as train the generator for a single step. The returned
+        dict of losses are used for logging summaries.
 
         Args:
             real: The input real images
             labels: The corresponding input labels
-            train_gen: Whether to train the generator or train the critic
 
         Returns:
             The generated images
             The dictionary of losses, as required by `log_summaries`
         """
+        for _ in range(self.disc_steps):
+            self.strategy.run(self._train_step, args=(real, labels, False))
         gen, losses = self.strategy.run(
-            self._train_step, args=(real, labels, train_gen)
+            self._train_step, args=(real, labels, True)
         )
 
         gen = reduce_concat(self.strategy, gen)
@@ -300,13 +317,10 @@ class GANTrainer:
         ]:
             model.save_weights(os.path.join(self.save_dir, file_name))
 
-    def train(
-        self, disc_steps: int, epochs: int, record_steps: int, save_steps: int
-    ) -> None:
+    def train(self, epochs: int, record_steps: int, save_steps: int) -> None:
         """Execute the training loops for the GAN.
 
         Args:
-            disc_steps: The number of discriminator steps per generator step
             epochs: Number of epochs to train the GAN
             record_steps: Step interval for recording summaries
             save_steps: Step interval for saving the model
@@ -322,27 +336,12 @@ class GANTrainer:
         # Initialize all optimizer variables
         self._init_optim()
 
-        # We use the argument `train_gen`, a boolean, to change the graph for
-        # training either the generator or the discriminator. `tf.function`
-        # will retrace every time when used as a decorator, so we manually
-        # create the two separate graphs to avoid retracing. The retracing for
-        # the graphs of different stages happen rarely, so there's no need to
-        # create separate graphs for them.
-        gen_train_step = tf.function(
-            lambda real, lbl: self.train_step(real, lbl, train_gen=True)
-        )
-        disc_train_step = tf.function(
-            lambda real, lbl: self.train_step(real, lbl, train_gen=False)
-        )
-
         for global_step, (_, (real, lbls)) in tqdm(
             enumerate(data_in_epochs, 1),
             total=epochs * total_batches,
             desc="Training",
         ):
-            for _ in range(disc_steps):
-                disc_train_step(real, lbls)
-            gen, losses = gen_train_step(real, lbls)
+            gen, losses = self.train_step(real, lbls)
 
             if global_step % record_steps == 0:
                 self.log_summaries(

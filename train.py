@@ -51,6 +51,7 @@ def main(args: Namespace) -> None:
         train_dataset,
         test_dataset,
         batch_size=args.batch_size,
+        disc_steps=args.disc_steps,
         noise_dims=args.noise_dims,
         gen_lr=args.gen_lr,
         crit_lr=args.crit_lr,
@@ -59,7 +60,6 @@ def main(args: Namespace) -> None:
         save_dir=args.save_dir,
     )
     trainer.train(
-        disc_steps=args.disc_steps,
         epochs=args.epochs,
         record_steps=args.record_steps,
         save_steps=args.save_steps,

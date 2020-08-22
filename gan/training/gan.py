@@ -11,7 +11,7 @@ from tqdm import tqdm
 from typing_extensions import Final
 
 from ..evaluation import RunningFID
-from ..utils import get_grid, iterator_product, wasserstein_gradient_penalty
+from ..utils import get_grid, iterator_product
 
 
 class GANTrainer:
@@ -99,6 +99,37 @@ class GANTrainer:
             ]
             optim.apply_gradients(grads_and_vars)
 
+    def _gradient_penalty(
+        self, real: Tensor, generated: Tensor, labels: Tensor
+    ) -> Tensor:
+        """Return the Wasserstein Gradient Penalty loss.
+
+        The original paper can be found at: https://arxiv.org/abs/1704.00028
+
+        Args:
+            real: The input real images
+            generated: The corresponding generated images
+            labels: The corresponding input labels
+
+        Returns:
+            The gradient penalty loss
+        """
+        with tf.GradientTape() as tape:
+            # U[0, 1] random value used for linear interpolation
+            gp_rand = tf.random.uniform(())
+            gp_inputs = real * gp_rand + generated * (1 - gp_rand)
+
+            # Forces the tape to track the inputs, which is needed for
+            # calculating gradients in the gradient penalty.
+            tape.watch(gp_inputs)
+            crit_gp_out = self.critic([gp_inputs, labels], training=True)
+
+        grads = tape.gradient(crit_gp_out, gp_inputs)
+        flat_grads = tf.reshape(grads, (grads.shape[0], -1))
+        norm = tf.norm(flat_grads, axis=1)
+        gp_batch = (norm - 1) ** 2
+        return tf.reduce_mean(gp_batch)
+
     def train_step(
         self, real: Tensor, labels: Tensor, train_gen: bool
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
@@ -123,27 +154,14 @@ class GANTrainer:
             generated = self.generator([noise, labels], training=True)
             crit_fake_out = self.critic([generated, labels], training=True)
 
-            # Tape for calculating gradient-penalty
-            with tf.GradientTape() as gp_tape:
-                # U[0, 1] random value used for linear interpolation
-                gp_rand = tf.random.uniform(())
-                gp_inputs = real * gp_rand + generated * (1 - gp_rand)
-
-                # Forces the tape to track the inputs, which is needed for
-                # calculating gradients in the gradient penalty.
-                gp_tape.watch(gp_inputs)
-                crit_gp_out = self.critic([gp_inputs, labels], training=True)
-
-            # Total Wasserstein loss
+            # Wasserstein distance
             wass_loss = tf.reduce_mean(crit_real_out - crit_fake_out)
 
             gen_reg = sum(self.generator.losses)
             gen_loss = wass_loss + gen_reg
 
             crit_reg = sum(self.critic.losses)
-            grad_pen = wasserstein_gradient_penalty(
-                gp_inputs, crit_gp_out, gp_tape
-            )
+            grad_pen = self._gradient_penalty(real, generated, labels)
             crit_loss = -wass_loss + crit_reg + self.gp_weight * grad_pen
 
         if train_gen:

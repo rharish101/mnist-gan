@@ -6,29 +6,7 @@ from typing import Any, Dict, Iterable, List
 
 import tensorflow as tf
 import yaml
-from tensorflow import GradientTape, Tensor
-
-
-def wasserstein_gradient_penalty(
-    inputs: Tensor, outputs: Tensor, tape: GradientTape
-) -> Tensor:
-    """Return the Wasserstein Gradient Penalty loss.
-
-    The original paper can be found at: https://arxiv.org/abs/1704.00028
-
-    Args:
-        inputs: The inputs for the critic
-        outputs: The critic's outputs for the above inputs
-        tape: The gradient tape for calculating gradients
-
-    Returns:
-        The gradient penalty loss
-    """
-    grads = tape.gradient(outputs, inputs)
-    flat_grads = tf.reshape(grads, (grads.shape[0], -1))
-    norm = tf.norm(flat_grads, axis=1)
-    penalty = tf.reduce_mean((norm - 1) ** 2)
-    return penalty
+from tensorflow import Tensor
 
 
 @tf.function

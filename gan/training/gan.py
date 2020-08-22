@@ -313,6 +313,14 @@ class GANTrainer:
                 tf.summary.image("real", real_grid, step=global_step)
                 tf.summary.image("generated", gen_grid, step=global_step)
 
+            with tf.name_scope("generator"):
+                for var in self.generator.trainable_variables:
+                    tf.summary.histogram(var.name, var, step=global_step)
+
+            with tf.name_scope("critic"):
+                for var in self.critic.trainable_variables:
+                    tf.summary.histogram(var.name, var, step=global_step)
+
     def save_models(self) -> None:
         """Save the models to disk."""
         for model, file_name in [

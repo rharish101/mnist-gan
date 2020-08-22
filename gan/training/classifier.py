@@ -66,6 +66,7 @@ class ClassifierTrainer:
             log_dir=log_dir,
             write_graph=log_graph,
             update_freq=record_eps * dataset_size,
+            histogram_freq=record_eps,
             profile_batch=0,
         )
 

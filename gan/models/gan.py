@@ -78,11 +78,11 @@ class Conditioning(Layer):
     classes is smaller than typical embedding sizes.
 
     Attributes:
-        weight_decay: The decay for L2 regularization
         embed: The core embedding layer
+        weight_decay: The decay for L2 regularization
     """
 
-    def __init__(self, weight_decay: float):
+    def __init__(self, weight_decay: float = 0):
         """Store weight decay."""
         super().__init__()
         self.weight_decay = weight_decay
@@ -115,7 +115,7 @@ class Conditioning(Layer):
         return tensor + labels_cond
 
 
-def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
+def get_generator(noise_dims: int, weight_decay: float = 0) -> Model:
     """Return the generator model.
 
     Args:
@@ -161,7 +161,7 @@ def get_generator(noise_dims: int, weight_decay: float = 2.5e-5) -> Model:
 
 
 def get_critic(
-    input_shape: Tuple[int, int, int], weight_decay: float = 2.5e-5,
+    input_shape: Tuple[int, int, int], weight_decay: float = 0
 ) -> Model:
     """Return the critic model.
 

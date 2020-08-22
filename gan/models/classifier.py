@@ -17,16 +17,16 @@ class Classifier(Model):
     """The image classifier model.
 
     Attributes:
-        weight_decay: The decay for L2 regularization
         feature_extract: The feature extraction layers
         final: The final classification layers
+        weight_decay: The decay for L2 regularization
     """
 
     def __init__(
         self,
         input_shape: Tuple[int, int, int],
         num_classes: int,
-        weight_decay: float = 2.5e-5,
+        weight_decay: float = 0,
     ):
         """Initialize all intermediate layers.
 

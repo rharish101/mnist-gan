@@ -286,18 +286,18 @@ class GANTrainer:
         with self.writer.as_default():
             with tf.name_scope("losses"):
                 tf.summary.scalar(
-                    "wasserstein loss", losses["wass"], step=global_step,
+                    "wasserstein_loss", losses["wass"], step=global_step
                 )
                 tf.summary.scalar(
-                    "gradient penalty", losses["grad_pen"], step=global_step,
+                    "gradient_penalty", losses["grad_pen"], step=global_step
                 )
                 tf.summary.scalar(
-                    "generator regularization",
+                    "generator_regularization",
                     losses["gen_reg"],
                     step=global_step,
                 )
                 tf.summary.scalar(
-                    "critic regularization",
+                    "critic_regularization",
                     losses["crit_reg"],
                     step=global_step,
                 )
@@ -307,7 +307,7 @@ class GANTrainer:
                 tf.summary.scalar("FID", fid, step=global_step)
 
             # Save generated and real images in a square grid
-            with tf.name_scope("image_summary"):
+            with tf.name_scope("images"):
                 real_grid = get_grid(real)
                 gen_grid = get_grid(generated)
                 tf.summary.image("real", real_grid, step=global_step)

@@ -8,6 +8,7 @@ from tensorflow.data import Dataset
 from tensorflow.distribute import ReduceOp, Strategy
 from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tqdm import tqdm
 from typing_extensions import Final
 
@@ -52,6 +53,8 @@ class GANTrainer:
         noise_dims: int,
         gen_lr: float,
         crit_lr: float,
+        decay_rate: float,
+        decay_steps: int,
         gp_weight: float,
         log_dir: str,
         save_dir: str,
@@ -70,6 +73,8 @@ class GANTrainer:
             noise_dims: The dimensions for the inputs to the generator
             gen_lr: The learning rate for the generator's optimizer
             crit_lr: The learning rate for the critic's optimizer
+            decay_rate: The rate of exponential learning rate decay
+            decay_steps: The base steps for exponential learning rate decay
             gp_weight: Weights for the critic's gradient penalty
             log_dir: Directory where to write event logs
             save_dir: Directory where to store model weights
@@ -83,8 +88,12 @@ class GANTrainer:
         self.val_dataset = val_dataset
 
         with strategy.scope():
-            self.gen_optim = Adam(gen_lr, 0.5)
-            self.crit_optim = Adam(crit_lr, 0.5)
+
+            def get_lr_sched(lr):
+                return ExponentialDecay(lr, decay_steps, decay_rate)
+
+            self.gen_optim = Adam(get_lr_sched(gen_lr), 0.5)
+            self.crit_optim = Adam(get_lr_sched(crit_lr), 0.5)
 
         self.evaluator = RunningFID(classifier)
         self.writer = tf.summary.create_file_writer(log_dir)

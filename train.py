@@ -55,6 +55,8 @@ def main(args: Namespace) -> None:
         noise_dims=args.noise_dims,
         gen_lr=args.gen_lr,
         crit_lr=args.crit_lr,
+        decay_rate=args.decay_rate,
+        decay_steps=args.decay_steps,
         gp_weight=args.gp_weight,
         log_dir=log_dir,
         save_dir=args.save_dir,
@@ -101,6 +103,18 @@ if __name__ == "__main__":
         type=float,
         default=1e-4,
         help="learning rate for critic optimization",
+    )
+    parser.add_argument(
+        "--decay-rate",
+        type=float,
+        default=0.8,
+        help="the rate of exponential learning rate decay",
+    )
+    parser.add_argument(
+        "--decay-steps",
+        type=int,
+        default=3000,
+        help="the base steps for exponential learning rate decay",
     )
     parser.add_argument(
         "--gp-weight",

@@ -35,10 +35,10 @@ class GANEvaluator:
         outputs = generated / 2 + 0.5
         outputs = tf.image.convert_image_dtype(outputs, tf.uint8)
 
-        # XXX: Use CPU as a workaround for this bug:
-        # https://github.com/tensorflow/tensorflow/issues/28007
-        with tf.device("/cpu:0"):
-            return tf.map_fn(tf.io.encode_jpeg, outputs, dtype=tf.string)
+        # Convert images into strings having JPEG content
+        return tf.map_fn(
+            tf.io.encode_jpeg, outputs, fn_output_signature=tf.string
+        )
 
     def generate(
         self, imgs_per_digit: int, batch_size: int, output_dir: str

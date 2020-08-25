@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Training a conditional GAN for MNIST."""
+"""Train a GAN."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
 from tensorflow.distribute import MirroredStrategy
 from typing_extensions import Final
 
-from gan.data import NUM_CLS, get_mnist_dataset
+from gan.data import IMG_SHAPE, NUM_CLS, get_dataset
 from gan.models import Classifier, get_critic, get_generator
 from gan.training import ClassifierTrainer, GANTrainer
 from gan.utils import setup_dirs
@@ -21,18 +21,18 @@ def main(args: Namespace) -> None:
     """
     strategy = MirroredStrategy()
 
-    train_dataset, test_dataset = get_mnist_dataset(
-        args.mnist_path, args.batch_size
-    )
-    image_shape = train_dataset.element_spec[0].shape.as_list()[1:]
+    train_dataset, test_dataset = get_dataset(args.data_path, args.batch_size)
 
     with strategy.scope():
         generator = get_generator(
-            args.noise_dims, weight_decay=args.weight_decay
+            args.noise_dims,
+            NUM_CLS,
+            IMG_SHAPE[-1],
+            weight_decay=args.weight_decay,
         )
-        critic = get_critic(image_shape, weight_decay=args.weight_decay)
+        critic = get_critic(IMG_SHAPE, NUM_CLS, weight_decay=args.weight_decay)
 
-        classifier = Classifier(image_shape, NUM_CLS)
+        classifier = Classifier(IMG_SHAPE, NUM_CLS)
         ClassifierTrainer.load_weights(classifier, args.load_dir)
 
     # Save each run into a directory by its timestamp
@@ -71,14 +71,14 @@ def main(args: Namespace) -> None:
 
 if __name__ == "__main__":
     parser = ArgumentParser(
-        description="Training an conditional GAN for MNIST",
+        description="Train a GAN",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--mnist-path",
+        "--data-path",
         type=str,
         default="./datasets/MNIST/",
-        help="path to the MNIST dataset",
+        help="path to the dataset",
     )
     parser.add_argument(
         "--batch-size",

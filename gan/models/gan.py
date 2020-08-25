@@ -1,4 +1,4 @@
-"""Generator and critic network models for MNIST."""
+"""Generator and critic network models."""
 from typing import Tuple, Type, Union
 
 import tensorflow as tf
@@ -82,17 +82,18 @@ class Conditioning(Layer):
         weight_decay: The decay for L2 regularization
     """
 
-    def __init__(self, weight_decay: float = 0):
+    def __init__(self, num_classes: int, weight_decay: float = 0):
         """Store weight decay."""
         super().__init__()
         self.weight_decay = weight_decay
+        self.num_classes = num_classes
 
     def build(self, input_shape: Tuple[Shape, Shape]) -> None:
         """Initialize the Conv2DTranspose and Embedding layers."""
         tensor_shape, _ = input_shape
         flat_dim = tensor_shape[1] * tensor_shape[2] * tensor_shape[3]
         self.embed = Embedding(
-            10,
+            self.num_classes,
             flat_dim,
             input_length=1,
             embeddings_regularizer=l2(self.weight_decay),
@@ -115,11 +116,15 @@ class Conditioning(Layer):
         return tensor + labels_cond
 
 
-def get_generator(noise_dims: int, weight_decay: float = 0) -> Model:
+def get_generator(
+    noise_dims: int, num_classes: int, img_ch: int, weight_decay: float = 0
+) -> Model:
     """Return the generator model.
 
     Args:
-        noise_dims: The dimensions of the input to the generator
+        noise_dims: The dimensions of the random noise
+        num_classes: The number of classes in the dataset
+        img_ch: The number of channels needed in the output image
         weight_decay: The decay for L2 regularization
 
     Returns:
@@ -129,7 +134,10 @@ def get_generator(noise_dims: int, weight_decay: float = 0) -> Model:
     labels = Input(shape=[])
 
     cond = Embedding(
-        10, 64, input_length=1, embeddings_regularizer=l2(weight_decay)
+        num_classes,
+        64,
+        input_length=1,
+        embeddings_regularizer=l2(weight_decay),
     )(labels)
     x = Concatenate(axis=-1)([noise, cond])
     x = Reshape([1, 1, x.shape[-1]])(x)
@@ -161,12 +169,15 @@ def get_generator(noise_dims: int, weight_decay: float = 0) -> Model:
 
 
 def get_critic(
-    input_shape: Tuple[int, int, int], weight_decay: float = 0
+    input_shape: Tuple[int, int, int],
+    num_classes: int,
+    weight_decay: float = 0,
 ) -> Model:
     """Return the critic model.
 
     Args:
         input_shape: The shape of the input images excluding the batch size
+        num_classes: The number of classes in the dataset
         weight_decay: The decay for L2 regularization
 
     Returns:
@@ -187,7 +198,7 @@ def get_critic(
             kernel_regularizer=l2(weight_decay),
             input_shape=input_shape,
         )(inputs)
-        x = Conditioning(weight_decay)((x, labels))
+        x = Conditioning(num_classes, weight_decay)((x, labels))
         if norm:
             x = LayerNormalization()(x)
         x = LeakyReLU(alpha=0.2)(x)

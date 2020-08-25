@@ -1,4 +1,4 @@
-"""Utilities for the MNIST GAN."""
+"""Utilities for the GAN."""
 import itertools
 import os
 from datetime import datetime

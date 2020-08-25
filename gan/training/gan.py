@@ -17,7 +17,7 @@ from ..utils import get_grid, iterator_product, reduce_concat
 
 
 class GANTrainer:
-    """Class to train an MNIST GAN.
+    """Class to train a GAN.
 
     Attributes:
         GEN_PATH: The prefix for the file name of the generator's saved weights

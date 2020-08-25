@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 class GANEvaluator:
-    """Class to generate images using an MNIST GAN.
+    """Class to generate images using a GAN.
 
     Attributes:
         generator: The generator model to be evaluated

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Generating MNIST digits using a conditional GAN."""
+"""Generate images using a trained GAN."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
+from gan.data import IMG_SHAPE, NUM_CLS
 from gan.evaluation import GANEvaluator
 from gan.models import get_generator
 from gan.training import GANTrainer
@@ -13,7 +14,7 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
-    generator = get_generator(args.noise_dims)
+    generator = get_generator(args.noise_dims, NUM_CLS, IMG_SHAPE[-1])
     GANTrainer.load_generator_weights(generator, args.load_dir)
 
     helper = GANEvaluator(generator, noise_dims=args.noise_dims)
@@ -22,7 +23,7 @@ def main(args: Namespace) -> None:
 
 if __name__ == "__main__":
     parser = ArgumentParser(
-        description="Generating MNIST digits using a conditional GAN",
+        description="Generate images using a trained GAN",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(

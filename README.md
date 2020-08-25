@@ -47,7 +47,7 @@ Thus, this needs to be set up only when one intends to commit changes to git.
 
 ### Training
 The GAN uses [Frechet Inception Distance](https://arxiv.org/abs/1706.08500) for evaluating its performance during training time.
-For this, we need to train an MNIST classifier before training the GAN.
+For this, we need to train a classifier before training the GAN.
 
 * Classifier: Run `classifier.py`:
     ```sh

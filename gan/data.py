@@ -1,4 +1,4 @@
-"""Data loading utilities for the MNIST GAN."""
+"""Data loading utilities for the GAN."""
 import itertools
 import os
 from typing import BinaryIO, Dict, List, Tuple
@@ -9,8 +9,8 @@ from tensorflow import Tensor
 from tensorflow.data import Dataset
 from typing_extensions import Final
 
-NUM_CLS: Final = 10  # number of classes in MNIST
-IMG_SIZE: Final = (64, 64)  # images will be resized to this
+NUM_CLS: Final = 10  # number of classes in the dataset
+IMG_SHAPE: Final = (64, 64, 1)  # (HWC) images will be resized to this
 
 # Map the size as found in IDX files to their respective numpy dtypes
 SIZE_TO_DTYPE: Final = {
@@ -60,11 +60,11 @@ def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
 
     The returned dataset is a dict with the structure:
         "train":
-            "images": A 4D array of uint8 28x28 grayscale MNIST training images
-            "labels": A 1D array of uint8 MNIST training labels
+            "images": A 4D array of uint8 28x28 grayscale training images
+            "labels": A 1D array of uint8 training labels
         "test":
-            "images": A 4D array of uint8 28x28 grayscale MNIST test images
-            "labels": A 1D array of uint8 MNIST test labels
+            "images": A 4D array of uint8 28x28 grayscale test images
+            "labels": A 1D array of uint8 test labels
 
     Args:
         mnist_path: Path to the MNIST dataset
@@ -93,14 +93,14 @@ def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
                 f'MNIST dataset file "{data_path}" not found.'
             )
 
-    print("\rLoaded MNIST dataset successfully")
+    print("\rLoaded dataset successfully")
 
     return dataset
 
 
 @tf.function
 def preprocess(img: Tensor, lbl: Tensor) -> Tuple[Tensor, Tensor]:
-    """Preprocess a raw MNIST image and its label.
+    """Preprocess a raw image and its label.
 
     This converts a 2D (width, height) tensor in the range [0, 255] into a
     float32 3D (width, height, channels) tensor in the range [-1, 1], after
@@ -108,37 +108,35 @@ def preprocess(img: Tensor, lbl: Tensor) -> Tuple[Tensor, Tensor]:
     """
     img = tf.expand_dims(img, -1)
     # This resizes and converts to float32 in the range [0, 255]
-    img = tf.image.resize(img, IMG_SIZE)
+    img = tf.image.resize(img, IMG_SHAPE[:2])
     # Scale from [0, 255] to [-1, 1]
     img = (img / 255) * 2 - 1
     lbl = tf.cast(lbl, tf.int64)
     return img, lbl
 
 
-def get_mnist_dataset(
-    mnist_path: str, batch_size: int
-) -> Tuple[Dataset, Dataset]:
-    """Get training and test dataset objects for the MNIST dataset.
+def get_dataset(data_path: str, batch_size: int) -> Tuple[Dataset, Dataset]:
+    """Get training and test dataset objects for the dataset.
 
     Args:
-        mnist_path: Path to the MNIST dataset
+        data_path: Path to the dataset
         batch_size: The batch size
 
     Returns:
         The training dataset object
         The test dataset object
     """
-    mnist = load_dataset(mnist_path)
+    dataset = load_dataset(data_path)
 
     train_dataset = Dataset.from_tensor_slices(
-        (mnist["train"]["images"], mnist["train"]["labels"])
+        (dataset["train"]["images"], dataset["train"]["labels"])
     )
     train_dataset = (
         train_dataset.map(preprocess).shuffle(10000).batch(batch_size)
     )
 
     test_dataset = Dataset.from_tensor_slices(
-        (mnist["test"]["images"], mnist["test"]["labels"])
+        (dataset["test"]["images"], dataset["test"]["labels"])
     )
     test_dataset = test_dataset.map(preprocess).batch(batch_size)
     return train_dataset, test_dataset

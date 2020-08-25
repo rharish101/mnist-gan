@@ -96,3 +96,12 @@ The generated images are saved in the directory given by the `--output-dir` argu
 By default, this directory is `outputs`.
 The images will be saved as JPEG images with the file name formatted as `{class_num}-{instance_num}.jpg`.
 Here, `{class_num}` is the index of the image's class, and `{instance_num}` signifies whether this is the 1st, 2nd, or nth image generated from that class.
+
+## Samples
+<p align="center">
+    <img src="images/0-1.jpg" alt="sample 0"> <img src="images/1-1.jpg" alt="sample 1"> <img src="images/2-1.jpg" alt="sample 2"> <img src="images/3-1.jpg" alt="sample 3"> <img src="images/4-1.jpg" alt="sample 4"> <img src="images/5-1.jpg" alt="sample 5"> <img src="images/6-1.jpg" alt="sample 6"> <img src="images/7-1.jpg" alt="sample 7"> <img src="images/8-1.jpg" alt="sample 8"> <img src="images/9-1.jpg" alt="sample 9">
+    <br>
+    <img src="images/0-2.jpg" alt="sample 0"> <img src="images/1-2.jpg" alt="sample 1"> <img src="images/2-2.jpg" alt="sample 2"> <img src="images/3-2.jpg" alt="sample 3"> <img src="images/4-2.jpg" alt="sample 4"> <img src="images/5-2.jpg" alt="sample 5"> <img src="images/6-2.jpg" alt="sample 6"> <img src="images/7-2.jpg" alt="sample 7"> <img src="images/8-2.jpg" alt="sample 8"> <img src="images/9-2.jpg" alt="sample 9">
+    <br>
+    <img src="images/0-3.jpg" alt="sample 0"> <img src="images/1-3.jpg" alt="sample 1"> <img src="images/2-3.jpg" alt="sample 2"> <img src="images/3-3.jpg" alt="sample 3"> <img src="images/4-3.jpg" alt="sample 4"> <img src="images/5-3.jpg" alt="sample 5"> <img src="images/6-3.jpg" alt="sample 6"> <img src="images/7-3.jpg" alt="sample 7"> <img src="images/8-3.jpg" alt="sample 8"> <img src="images/9-3.jpg" alt="sample 9">
+</p>

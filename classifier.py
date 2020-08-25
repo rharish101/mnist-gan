@@ -113,7 +113,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--log-dir",
         type=str,
-        default="./logs/",
+        default="./logs/classifier",
         help="directory where to write event logs",
     )
     main(parser.parse_args())

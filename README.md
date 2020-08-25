@@ -9,7 +9,7 @@ This supports multi-GPU training on a single machine using TensorFlow's [`tf.dis
 
 ## Instructions
 
-All scripts use argparse to parse commandline arguments.
+All Python scripts use argparse to parse commandline arguments.
 For viewing the list of all positional and optional arguments for any script, type:
 ```sh
 ./script.py --help
@@ -25,6 +25,8 @@ For viewing the list of all positional and optional arguments for any script, ty
     ```sh
     ./download_mnist.sh [/path/where/dataset/should/be/saved/]
     ```
+
+    By default, this dataset is saved to the directory `datasets/MNIST`.
 
 #### For Contributing
 1. Install extra dependencies for development (with Python 3.6+):
@@ -50,8 +52,14 @@ For viewing the list of all positional and optional arguments for any script, ty
     ./train.py
     ```
 
-Trained models are saved in TensorFlow's ckpt format (to the directory given by the `--save-dir` argument).
+The weights of trained models are saved in TensorFlow's ckpt format to the directory given by the `--save-dir` argument.
+By default, this directory is `checkpoints` for both the classifier and the GAN.
+
 Training logs are by default stored inside an ISO 8601 timestamp named subdirectory, which is stored in a parent directory (as given by the `--log-dir` argument).
+By default, this directory is `logs/classifier` for classifier, and `logs/gan` for the GAN.
+
+Copies of the CLI arguments are saved as a YAML file in both the model checkpoint directory and the timestamped log directory.
+For the classifier, it is named `config-cls.yaml`, and for the GAN, it is named `config-gan.yaml`.
 
 ### Generation
 Run `generate.py`:
@@ -59,3 +67,4 @@ Run `generate.py`:
 ./generate.py
 ```
 The generated images are saved in the directory given by the `--output-dir` argument.
+By default, this directory is `outputs`.

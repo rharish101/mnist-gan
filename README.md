@@ -17,12 +17,30 @@ To view the default hyper-parameters, use the `-h` or `--help` flags for a scrip
 The default values should be in parentheses next to the descriptions of the CLI options.
 
 ### Setup
-1. Install all required Python libraries (requires Python >= 3.8):
+[Poetry](https://python-poetry.org/) is used for conveniently installing and managing dependencies.
+
+1. *[Optional]* Create and activate a virtual environment with Python >= 3.8.
+
+2. Install Poetry globally (recommended), or in a virtual environment.
+    Please refer to [Poetry's installation guide](https://python-poetry.org/docs/#installation) for recommended installation options.
+
+    You can use pip to install it:
     ```sh
-    pip install -r requirements.txt
+    pip install poetry
     ```
 
-2. Download the MNIST dataset using the provided script (requires cURL >= 7.19.0):
+3. Install all dependencies with Poetry:
+    ```sh
+    poetry install --no-dev
+    ```
+
+    If you didn't create and activate a virtual environment in step 1, Poetry creates one for you and installs all dependencies there.
+    To use this virtual environment, run:
+    ```sh
+    poetry shell
+    ```
+
+4. Download the MNIST dataset using the provided script (requires cURL >= 7.19.0):
     ```sh
     ./download_mnist.sh [/path/where/dataset/should/be/saved/]
     ```
@@ -33,17 +51,20 @@ The default values should be in parentheses next to the descriptions of the CLI 
 [pre-commit](https://pre-commit.com/) is used for managing hooks that run before each commit, to ensure code quality and run some basic tests.
 Thus, this needs to be set up only when one intends to commit changes to git.
 
-1. Install extra dependencies for development (with Python 3.8+):
+1. Activate the virtual environment where you installed the dependencies.
+
+2. Install all dependencies, including extra dependencies for development:
     ```sh
-    pip install -r requirements-dev.txt
+    poetry install
     ```
 
-2. Install pre-commit hooks:
+3. Install pre-commit hooks:
     ```sh
     pre-commit install
     ```
 
 **NOTE**: You need to be inside the virtual environment where you installed the above dependencies every time you commit.
+However, this is not required if you have installed pre-commit globally.
 
 ### Training
 The GAN uses [Frechet Inception Distance](https://arxiv.org/abs/1706.08500) for evaluating its performance during training time.

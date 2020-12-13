@@ -1,13 +1,12 @@
 """Data loading utilities for the GAN."""
 import itertools
 import os
-from typing import BinaryIO, Dict, List, Tuple
+from typing import BinaryIO, Dict, Final, List, Tuple
 
 import numpy as np
 import tensorflow as tf
 from tensorflow import Tensor
 from tensorflow.data import Dataset
-from typing_extensions import Final
 
 NUM_CLS: Final = 10  # number of classes in the dataset
 IMG_SHAPE: Final = (64, 64, 1)  # (HWC) images will be resized to this

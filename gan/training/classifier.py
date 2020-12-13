@@ -1,5 +1,6 @@
 """Class for training a classifier for FID."""
 import os
+from typing import Final
 
 from tensorflow.data import Dataset
 from tensorflow.distribute import Strategy
@@ -7,7 +8,6 @@ from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
-from typing_extensions import Final
 
 
 class ClassifierTrainer:

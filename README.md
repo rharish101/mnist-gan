@@ -17,7 +17,7 @@ To view the default hyper-parameters, use the `-h` or `--help` flags for a scrip
 The default values should be in parentheses next to the descriptions of the CLI options.
 
 ### Setup
-1. Install all required Python libraries (requires Python >= 3.6):
+1. Install all required Python libraries (requires Python >= 3.8):
     ```sh
     pip install -r requirements.txt
     ```
@@ -33,7 +33,7 @@ The default values should be in parentheses next to the descriptions of the CLI 
 [pre-commit](https://pre-commit.com/) is used for managing hooks that run before each commit, to ensure code quality and run some basic tests.
 Thus, this needs to be set up only when one intends to commit changes to git.
 
-1. Install extra dependencies for development (with Python 3.6+):
+1. Install extra dependencies for development (with Python 3.8+):
     ```sh
     pip install -r requirements-dev.txt
     ```

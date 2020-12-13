@@ -1,6 +1,6 @@
 """Class for training the GAN."""
 import os
-from typing import Dict, Tuple
+from typing import Dict, Final, Tuple
 
 import tensorflow as tf
 from tensorflow import Tensor
@@ -10,7 +10,6 @@ from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tqdm import tqdm
-from typing_extensions import Final
 
 from ..evaluation import RunningFID
 from ..utils import get_grid, iterator_product, reduce_concat

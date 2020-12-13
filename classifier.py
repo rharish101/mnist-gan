@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Train a classifier for FID."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+from typing import Final
 
 from tensorflow.distribute import MirroredStrategy
-from typing_extensions import Final
 
 from gan.data import IMG_SHAPE, NUM_CLS, get_dataset
 from gan.models import Classifier

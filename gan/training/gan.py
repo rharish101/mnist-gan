@@ -1,5 +1,5 @@
 """Class for training the GAN."""
-import os
+from pathlib import Path
 from typing import Dict, Final, Tuple
 
 import tensorflow as tf
@@ -56,8 +56,8 @@ class GANTrainer:
         decay_rate: float,
         decay_steps: int,
         gp_weight: float,
-        log_dir: str,
-        save_dir: str,
+        log_dir: Path,
+        save_dir: Path,
         mixed_precision: bool = False,
     ):
         """Store main models and info required for training.
@@ -103,7 +103,7 @@ class GANTrainer:
             self.crit_optim = LossScaleOptimizer(self.crit_optim)
 
         self.evaluator = RunningFID(classifier)
-        self.writer = tf.summary.create_file_writer(log_dir)
+        self.writer = tf.summary.create_file_writer(str(log_dir))
 
         self.batch_size = batch_size
         self.crit_steps = crit_steps
@@ -347,7 +347,7 @@ class GANTrainer:
             (self.generator, self.GEN_PATH),
             (self.critic, self.CRIT_PATH),
         ]:
-            model.save_weights(os.path.join(self.save_dir, file_name))
+            model.save_weights(self.save_dir / file_name)
 
     def train(
         self,
@@ -405,7 +405,7 @@ class GANTrainer:
         self.save_models()
 
     @classmethod
-    def load_generator_weights(cls, generator: Model, load_dir: str) -> None:
+    def load_generator_weights(cls, generator: Model, load_dir: Path) -> None:
         """Load the generator weights from disk.
 
         This replaces the generator's weights with the loaded ones, in place.
@@ -414,4 +414,4 @@ class GANTrainer:
             generator: The generator model whose weights are to be loaded
             load_dir: Directory from where to load model weights
         """
-        generator.load_weights(os.path.join(load_dir, cls.GEN_PATH))
+        generator.load_weights(load_dir / cls.GEN_PATH)

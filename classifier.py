@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Train a classifier for FID."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+from pathlib import Path
 from typing import Final
 
 from tensorflow.distribute import MirroredStrategy
@@ -24,15 +25,18 @@ def main(args: Namespace) -> None:
     if args.mixed_precision:
         set_global_policy("mixed_float16")
 
-    train_dataset, test_dataset = get_dataset(args.data_path, args.batch_size)
+    train_dataset, test_dataset = get_dataset(
+        Path(args.data_path), args.batch_size
+    )
 
     with strategy.scope():
         model = Classifier(IMG_SHAPE, NUM_CLS, weight_decay=args.weight_decay)
 
+    save_dir = Path(args.save_dir)
     # Save each run into a directory by its timestamp.
     log_dir = setup_dirs(
-        dirs=[args.save_dir],
-        dirs_to_tstamp=[args.log_dir],
+        dirs=[save_dir],
+        dirs_to_tstamp=[Path(args.log_dir)],
         config=vars(args),
         file_name=CONFIG,
     )[0]
@@ -44,7 +48,7 @@ def main(args: Namespace) -> None:
         epochs=args.epochs,
         log_dir=log_dir,
         record_eps=args.record_eps,
-        save_dir=args.save_dir,
+        save_dir=save_dir,
         save_steps=args.save_steps,
         log_graph=args.log_graph,
     )

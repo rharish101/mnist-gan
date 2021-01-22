@@ -1,7 +1,7 @@
 """Utilities for the GAN."""
 import itertools
-import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Union
 
 import tensorflow as tf
@@ -88,11 +88,11 @@ def get_grid(img: Tensor) -> Tensor:
 
 
 def setup_dirs(
-    dirs: List[str],
+    dirs: List[Path],
     config: Dict[str, Any],
     file_name: str,
-    dirs_to_tstamp: List[str] = [],
-) -> List[str]:
+    dirs_to_tstamp: List[Path] = [],
+) -> List[Path]:
     """Create the required directories and dump the config there.
 
     This supports creating timestamped directories in requested directories. It
@@ -110,14 +110,14 @@ def setup_dirs(
     tstamped_dirs = []
     for directory in dirs_to_tstamp:
         time_stamp = datetime.now().isoformat()
-        new_dir = os.path.join(directory, time_stamp)
+        new_dir = directory / time_stamp
         tstamped_dirs.append(new_dir)
 
     # Save hyperparams in both log and save directories
     for directory in itertools.chain(dirs, tstamped_dirs):
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        with open(os.path.join(directory, file_name), "w") as conf:
+        if not directory.exists():
+            directory.mkdir(parents=True)
+        with open(directory / file_name, "w") as conf:
             yaml.dump(config, conf)
 
     return tstamped_dirs

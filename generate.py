@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate images using a trained GAN."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+from pathlib import Path
 
 from tensorflow.keras.mixed_precision import set_global_policy
 
@@ -20,10 +21,12 @@ def main(args: Namespace) -> None:
         set_global_policy("mixed_float16")
 
     generator = get_generator(args.noise_dims, NUM_CLS, IMG_SHAPE[-1])
-    GANTrainer.load_generator_weights(generator, args.load_dir)
+    GANTrainer.load_generator_weights(generator, Path(args.load_dir))
 
     helper = GANEvaluator(generator, noise_dims=args.noise_dims)
-    helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
+    helper.generate(
+        args.imgs_per_digit, args.batch_size, Path(args.output_dir)
+    )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 """Class for generation using the GAN."""
-import os
+from pathlib import Path
 
 import tensorflow as tf
 from tensorflow.keras import Model
@@ -41,7 +41,7 @@ class GANEvaluator:
         )
 
     def generate(
-        self, imgs_per_digit: int, batch_size: int, output_dir: str
+        self, imgs_per_digit: int, batch_size: int, output_dir: Path
     ) -> None:
         """Generate the digits and save them to disk.
 
@@ -52,8 +52,8 @@ class GANEvaluator:
         """
         total_imgs = 10 * imgs_per_digit
 
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
 
         with tqdm(total=total_imgs, desc="Saving") as pbar:
             for start in range(0, total_imgs, batch_size):
@@ -64,9 +64,7 @@ class GANEvaluator:
                 imgs = self._gen_img(digits).numpy()
                 for i, img in enumerate(imgs):
                     idx = start + i
-                    img_name = os.path.join(
-                        output_dir, f"{idx % 10}-{1 + idx // 10}.jpg"
-                    )
+                    img_name = output_dir / f"{idx % 10}-{1 + idx // 10}.jpg"
                     with open(img_name, "wb") as img_file:
                         img_file.write(img)
                     pbar.update()

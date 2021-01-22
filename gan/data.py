@@ -1,6 +1,6 @@
 """Data loading utilities for the GAN."""
 import itertools
-import os
+from pathlib import Path
 from typing import BinaryIO, Dict, Final, List, Tuple
 
 import numpy as np
@@ -51,7 +51,7 @@ def _load_idx(idx: BinaryIO) -> np.ndarray:
     return np.reshape(image, shape, order="C")
 
 
-def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
+def load_dataset(mnist_path: Path) -> Dict[str, Dict[str, np.ndarray]]:
     """Load the MNIST IDX image files and return numpy arrays.
 
     The images are grayscale uint8 images, of shape (images, width, height).
@@ -72,7 +72,7 @@ def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
         The dict of the dataset
     """
     # Expand "~"
-    mnist_path = os.path.expanduser(mnist_path)
+    mnist_path = mnist_path.expanduser()
     dataset: Dict[str, Dict[str, np.ndarray]] = {"train": {}, "test": {}}
 
     # Prefixes and infixes for generating filenames
@@ -80,11 +80,11 @@ def load_dataset(mnist_path: str) -> Dict[str, Dict[str, np.ndarray]]:
     infixes: Dict[str, str] = {"images": "3", "labels": "1"}
 
     for mode, data in itertools.product(prefixes, infixes):
-        filename = f"{prefixes[mode]}-{data}-idx{infixes[data]}-ubyte"
-        data_path = os.path.join(mnist_path, filename)
+        file_name = f"{prefixes[mode]}-{data}-idx{infixes[data]}-ubyte"
+        data_path = mnist_path / file_name
 
         print(f"\rLoading {mode} {data}...", end="")
-        if os.path.exists(data_path):  # decompressed dataset
+        if data_path.exists():  # decompressed dataset
             with open(data_path, "rb") as idx:
                 dataset[mode][data] = _load_idx(idx)
         else:
@@ -114,7 +114,7 @@ def preprocess(img: Tensor, lbl: Tensor) -> Tuple[Tensor, Tensor]:
     return img, lbl
 
 
-def get_dataset(data_path: str, batch_size: int) -> Tuple[Dataset, Dataset]:
+def get_dataset(data_path: Path, batch_size: int) -> Tuple[Dataset, Dataset]:
     """Get training and test dataset objects for the dataset.
 
     Args:

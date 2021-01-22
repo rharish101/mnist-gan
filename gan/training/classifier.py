@@ -1,5 +1,5 @@
 """Class for training a classifier for FID."""
-import os
+from pathlib import Path
 from typing import Final
 
 from tensorflow.data import Dataset
@@ -49,9 +49,9 @@ class ClassifierTrainer:
         train_dataset: Dataset,
         val_dataset: Dataset,
         epochs: int,
-        log_dir: str,
+        log_dir: Path,
         record_eps: int,
-        save_dir: str,
+        save_dir: Path,
         save_steps: int,
         log_graph: bool = False,
     ) -> None:
@@ -78,7 +78,7 @@ class ClassifierTrainer:
             profile_batch=0,
         )
 
-        save_path = os.path.join(save_dir, self.CLS_PATH)
+        save_path = save_dir / self.CLS_PATH
         saver = ModelCheckpoint(
             save_path, save_weights_only=True, save_freq=save_steps
         )
@@ -94,7 +94,7 @@ class ClassifierTrainer:
         self.model.save_weights(save_path)
 
     @classmethod
-    def load_weights(cls, model: Model, load_dir: str) -> None:
+    def load_weights(cls, model: Model, load_dir: Path) -> None:
         """Load the model's weights from disk.
 
         This replaces the model's weights with the loaded ones, in place.
@@ -103,5 +103,5 @@ class ClassifierTrainer:
             model: The model whose weights are to be loaded
             load_dir: Directory from where to load model weights
         """
-        status = model.load_weights(os.path.join(load_dir, cls.CLS_PATH))
+        status = model.load_weights(load_dir / cls.CLS_PATH)
         status.expect_partial()

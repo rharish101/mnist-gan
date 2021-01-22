@@ -4,6 +4,7 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from typing import Final
 
 from tensorflow.distribute import MirroredStrategy
+from tensorflow.keras.mixed_precision import set_global_policy
 
 from gan.data import IMG_SHAPE, NUM_CLS, get_dataset
 from gan.models import Classifier
@@ -20,6 +21,8 @@ def main(args: Namespace) -> None:
         args: The object containing the commandline arguments
     """
     strategy = MirroredStrategy()
+    if args.mixed_precision:
+        set_global_policy("mixed_float16")
 
     train_dataset, test_dataset = get_dataset(args.data_path, args.batch_size)
 
@@ -81,6 +84,11 @@ if __name__ == "__main__":
         type=int,
         default=25,
         help="the maximum number of epochs for training the classifier",
+    )
+    parser.add_argument(
+        "--mixed-precision",
+        action="store_true",
+        help="train with mixed-precision for higher performance",
     )
     parser.add_argument(
         "--save-dir",

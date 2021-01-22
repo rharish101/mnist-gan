@@ -99,11 +99,21 @@ CUDA_VISIBLE_DEVICES=0,1,3 ./script.py
 This selects the GPUs 0, 1 and 3 for training.
 By default, all available GPUs are chosen.
 
+#### On-demand GPU Memory
 TensorFlow allocates all the available GPU memory on each GPU.
 To instruct TensorFlow to allocate GPU memory only on demand, set the `TF_FORCE_GPU_ALLOW_GROWTH` environment variable when running a script as follows:
 ```sh
 TF_FORCE_GPU_ALLOW_GROWTH=true ./script.py
 ```
+
+#### Mixed Precision Training
+This implementation supports mixed-precision training.
+This can be enabled using the `--mixed-precision` CLI flag, as follows:
+```sh
+./script.py --mixed-precision
+```
+
+Note that this will only provide significant speed-ups if your GPU(s) have special support for mixed-precision compute.
 
 ### Generation
 A generation script is provided to generate images using a trained GAN.

@@ -2,6 +2,8 @@
 """Generate images using a trained GAN."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 
+from tensorflow.keras.mixed_precision import set_global_policy
+
 from gan.data import IMG_SHAPE, NUM_CLS
 from gan.evaluation import GANEvaluator
 from gan.models import get_generator
@@ -14,6 +16,9 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
+    if args.mixed_precision:
+        set_global_policy("mixed_float16")
+
     generator = get_generator(args.noise_dims, NUM_CLS, IMG_SHAPE[-1])
     GANTrainer.load_generator_weights(generator, args.load_dir)
 
@@ -43,6 +48,11 @@ if __name__ == "__main__":
         type=int,
         default=128,
         help="the number of images in each batch of generation",
+    )
+    parser.add_argument(
+        "--mixed-precision",
+        action="store_true",
+        help="train with mixed-precision for higher performance",
     )
     parser.add_argument(
         "--imgs-per-digit",

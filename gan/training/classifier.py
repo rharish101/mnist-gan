@@ -19,15 +19,23 @@ class ClassifierTrainer:
 
     CLS_PATH: Final = "classifier.ckpt"
 
-    def __init__(self, model: Model, strategy: Strategy, lr: float):
+    def __init__(
+        self,
+        model: Model,
+        strategy: Strategy,
+        lr: float,
+        mixed_precision: bool = False,
+    ):
         """Store the main model and other required info.
 
         Args:
             model: The classifier model to be trained
             strategy: The distribution strategy for training the model
             lr: The learning rate for Adam
+            mixed_precision: Whether to use mixed-precision for training
         """
         with strategy.scope():
+            # Takes care of mixed-precision by itself
             model.compile(
                 optimizer=Adam(lr),
                 loss=SparseCategoricalCrossentropy(from_logits=True),

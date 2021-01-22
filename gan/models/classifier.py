@@ -51,7 +51,7 @@ class Classifier(Model):
         ]
 
         self.feature_extract = Sequential(base_layers)
-        self.final = Dense(num_classes)
+        self.final = Dense(num_classes, dtype="float32")
 
     def conv_block(self, out_channels: int) -> Sequential:
         """Return a ResNet block with batch-norm and ReLU."""

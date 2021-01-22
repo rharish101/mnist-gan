@@ -7,6 +7,7 @@ from tensorflow import Tensor
 from tensorflow.data import Dataset
 from tensorflow.distribute import ReduceOp, Strategy
 from tensorflow.keras import Model
+from tensorflow.keras.mixed_precision import LossScaleOptimizer
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tqdm import tqdm
@@ -57,6 +58,7 @@ class GANTrainer:
         gp_weight: float,
         log_dir: str,
         save_dir: str,
+        mixed_precision: bool = False,
     ):
         """Store main models and info required for training.
 
@@ -77,11 +79,13 @@ class GANTrainer:
             gp_weight: Weights for the critic's gradient penalty
             log_dir: Directory where to write event logs
             save_dir: Directory where to store model weights
+            mixed_precision: Whether to use mixed-precision for training
         """
         self.generator = generator
         self.critic = critic
 
         self.strategy = strategy
+        self.mixed_precision = mixed_precision
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -93,6 +97,10 @@ class GANTrainer:
 
             self.gen_optim = Adam(get_lr_sched(gen_lr), 0.5)
             self.crit_optim = Adam(get_lr_sched(crit_lr), 0.5)
+
+        if mixed_precision:
+            self.gen_optim = LossScaleOptimizer(self.gen_optim)
+            self.crit_optim = LossScaleOptimizer(self.crit_optim)
 
         self.evaluator = RunningFID(classifier)
         self.writer = tf.summary.create_file_writer(log_dir)
@@ -212,7 +220,11 @@ class GANTrainer:
             loss = crit_loss
             optim = self.crit_optim
 
+        if self.mixed_precision:
+            loss = optim.get_scaled_loss(loss)
         grads = tape.gradient(loss, train_vars)
+        if self.mixed_precision:
+            grads = optim.get_unscaled_gradients(grads)
         optim.apply_gradients(zip(grads, train_vars))
 
         # Losses required for logging summaries

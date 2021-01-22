@@ -54,7 +54,7 @@ def spectralize(layer: Type[Layer]) -> Type[Layer]:  # noqa: D202
             v = tf.linalg.normalize(tf.matmul(tf.transpose(w), self.u))[0]
             u = tf.linalg.normalize(tf.matmul(w, v))[0]
             if training:
-                self.u.assign(u)
+                self.u.assign(tf.cast(u, self.u.dtype))
 
             u = tf.stop_gradient(u)
             v = tf.stop_gradient(v)
@@ -64,7 +64,9 @@ def spectralize(layer: Type[Layer]) -> Type[Layer]:  # noqa: D202
         def call(self, inputs: Tensor, training: bool = False) -> Tensor:
             """Perform spectral normalization before calling the layer."""
             spec_norm = self._spectral_norm(self.kernel, training=training)
-            self.kernel.assign(self.kernel / spec_norm)
+            self.kernel.assign(
+                tf.cast(self.kernel / spec_norm, self.kernel.dtype)
+            )
             return super().call(inputs)
 
     return SpectralLayer
@@ -153,6 +155,7 @@ def get_generator(
             activation="tanh" if last else None,
             use_bias=True if last else False,
             kernel_regularizer=l2(weight_decay),
+            dtype="float32" if last else None,
         )(inputs)
         if not last:
             x = BatchNormalization()(x)
@@ -216,6 +219,7 @@ def get_critic(
         padding="valid",
         use_bias=True,
         kernel_regularizer=l2(weight_decay),
+        dtype="float32",
     )(x)
 
     return Model(inputs=[inputs, labels], outputs=outputs)

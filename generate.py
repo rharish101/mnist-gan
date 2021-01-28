@@ -21,12 +21,10 @@ def main(args: Namespace) -> None:
         set_global_policy("mixed_float16")
 
     generator = get_generator(args.noise_dims, NUM_CLS, IMG_SHAPE[-1])
-    GANTrainer.load_generator_weights(generator, Path(args.load_dir))
+    GANTrainer.load_generator_weights(generator, args.load_dir)
 
     helper = GANEvaluator(generator, noise_dims=args.noise_dims)
-    helper.generate(
-        args.imgs_per_digit, args.batch_size, Path(args.output_dir)
-    )
+    helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
 
 
 if __name__ == "__main__":
@@ -36,7 +34,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--load-dir",
-        type=str,
+        type=Path,
         default="./checkpoints/",
         help="directory where the trained model is saved",
     )
@@ -65,7 +63,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output-dir",
-        type=str,
+        type=Path,
         default="./outputs/",
         help="where to save the generated images",
     )

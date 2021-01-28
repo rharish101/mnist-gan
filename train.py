@@ -25,9 +25,7 @@ def main(args: Namespace) -> None:
     if args.mixed_precision:
         set_global_policy("mixed_float16")
 
-    train_dataset, test_dataset = get_dataset(
-        Path(args.data_path), args.batch_size
-    )
+    train_dataset, test_dataset = get_dataset(args.data_path, args.batch_size)
 
     with strategy.scope():
         generator = get_generator(
@@ -39,13 +37,12 @@ def main(args: Namespace) -> None:
         critic = get_critic(IMG_SHAPE, NUM_CLS, weight_decay=args.weight_decay)
 
         classifier = Classifier(IMG_SHAPE, NUM_CLS)
-        ClassifierTrainer.load_weights(classifier, Path(args.load_dir))
+        ClassifierTrainer.load_weights(classifier, args.load_dir)
 
-    save_dir = Path(args.save_dir)
     # Save each run into a directory by its timestamp
     log_dir = setup_dirs(
-        dirs=[save_dir],
-        dirs_to_tstamp=[Path(args.log_dir)],
+        dirs=[args.save_dir],
+        dirs_to_tstamp=[args.log_dir],
         config=vars(args),
         file_name=CONFIG,
     )[0]
@@ -66,7 +63,7 @@ def main(args: Namespace) -> None:
         decay_steps=args.decay_steps,
         gp_weight=args.gp_weight,
         log_dir=log_dir,
-        save_dir=save_dir,
+        save_dir=args.save_dir,
     )
     trainer.train(
         epochs=args.epochs,
@@ -83,7 +80,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data-path",
-        type=str,
+        type=Path,
         default="./datasets/MNIST/",
         help="path to the dataset",
     )
@@ -154,13 +151,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--load-dir",
-        type=str,
+        type=Path,
         default="./checkpoints/",
         help="directory where the trained classifier model is saved",
     )
     parser.add_argument(
         "--save-dir",
-        type=str,
+        type=Path,
         default="./checkpoints/",
         help="directory where to save the GAN models",
     )
@@ -183,7 +180,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--log-dir",
-        type=str,
+        type=Path,
         default="./logs/gan",
         help="directory where to write event logs",
     )

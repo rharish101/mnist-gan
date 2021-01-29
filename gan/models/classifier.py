@@ -54,7 +54,7 @@ class Classifier(Model):
         self.final = Dense(num_classes, dtype="float32")
 
     def conv_block(self, out_channels: int) -> Sequential:
-        """Return a ResNet block with batch-norm and ReLU."""
+        """Return a convolution block with batch-norm and ReLU."""
         layers = [
             Conv2D(
                 out_channels,

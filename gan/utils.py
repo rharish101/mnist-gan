@@ -157,12 +157,14 @@ def setup_dirs(
         new_dir = directory / time_stamp
         tstamped_dirs.append(new_dir)
 
+    to_dump = {**vars(config), "date": curr_date}
+
     # Save hyperparams in both log and save directories
     for directory in itertools.chain(dirs, tstamped_dirs):
         if not directory.exists():
             directory.mkdir(parents=True)
         with open(directory / file_name, "w") as conf:
-            yaml.dump(vars(config), conf)
+            yaml.dump(to_dump, conf)
 
     return tstamped_dirs
 

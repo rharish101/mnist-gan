@@ -95,7 +95,7 @@ By default, this directory is `checkpoints` for both the classifier and the GAN.
 Training logs are by default stored inside an ISO 8601 timestamp named subdirectory, which is stored in a parent directory (as given by the `--log-dir` argument).
 By default, this directory is `logs/classifier` for classifier, and `logs/gan` for the GAN.
 
-The hyper-parameter config is saved as a YAML file in both the model checkpoint directory and the timestamped log directory.
+The hyper-parameter config, along with the current date and time, is saved as a YAML file in both the model checkpoint directory and the timestamped log directory.
 For the classifier, it is named `config-cls.yaml`, and for the GAN, it is named `config-gan.yaml`.
 
 #### Multi-GPU Training

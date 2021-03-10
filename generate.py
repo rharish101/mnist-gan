@@ -5,10 +5,10 @@ from pathlib import Path
 
 from tensorflow.keras.mixed_precision import set_global_policy
 
-from gan.data import IMG_SHAPE, NUM_CLS
 from gan.evaluation import GANEvaluator
 from gan.models import get_generator
 from gan.training import GANTrainer
+from gan.utils import load_config
 
 
 def main(args: Namespace) -> None:
@@ -17,14 +17,16 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
-    if args.mixed_precision:
+    config = load_config(args.config)
+
+    if config.mixed_precision:
         set_global_policy("mixed_float16")
 
-    generator = get_generator(args.noise_dims, NUM_CLS, IMG_SHAPE[-1])
+    generator = get_generator(config)
     GANTrainer.load_generator_weights(generator, args.load_dir)
 
-    helper = GANEvaluator(generator, noise_dims=args.noise_dims)
-    helper.generate(args.imgs_per_digit, args.batch_size, args.output_dir)
+    helper = GANEvaluator(generator, config)
+    helper.generate(args.imgs_per_digit, args.output_dir)
 
 
 if __name__ == "__main__":
@@ -39,21 +41,10 @@ if __name__ == "__main__":
         help="directory where the trained model is saved",
     )
     parser.add_argument(
-        "--noise-dims",
-        type=int,
-        default=100,
-        help="dimensions of the generator noise vector",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=128,
-        help="the number of images in each batch of generation",
-    )
-    parser.add_argument(
-        "--mixed-precision",
-        action="store_true",
-        help="train with mixed-precision for higher performance",
+        "-c",
+        "--config",
+        type=Path,
+        help="Path to a YAML config containing hyper-parameter values",
     )
     parser.add_argument(
         "--imgs-per-digit",

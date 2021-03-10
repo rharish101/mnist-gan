@@ -5,3 +5,4 @@ logs/
 checkpoints/
 outputs/
 datasets/
+configs/

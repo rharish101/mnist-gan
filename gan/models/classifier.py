@@ -1,5 +1,5 @@
 """Classifier model for FID."""
-from typing import Optional, Tuple
+from typing import Optional
 
 from tensorflow import Tensor
 from tensorflow.keras import Input, Model, Sequential
@@ -12,6 +12,9 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.regularizers import l2
 
+from ..data import IMG_SHAPE, NUM_CLS
+from ..utils import Config
+
 
 class Classifier(Model):
     """The image classifier model.
@@ -19,39 +22,36 @@ class Classifier(Model):
     Attributes:
         feature_extract: The feature extraction layers
         final: The final classification layers
-        weight_decay: The decay for L2 regularization
+        config: The hyper-param config
     """
 
-    def __init__(
-        self,
-        input_shape: Tuple[int, int, int],
-        num_classes: int,
-        weight_decay: float = 0,
-    ):
+    def __init__(self, config: Config):
         """Initialize all intermediate layers.
 
         Args:
-            input_shape: The shape of the inputs excluding the batch size
-            num_classes: The number of classes for classification
-            weight_decay: The decay for L2 regularization
+            config: The hyper-param config
         """
         super().__init__()
-        self.weight_decay = weight_decay
+        self.config = config
 
         base_layers = [
-            Input(shape=input_shape),
+            Input(shape=IMG_SHAPE),
             self.conv_block(8),
             self.conv_block(16),
             self.conv_block(32),
             self.conv_block(64),
             Flatten(),
-            Dense(128, use_bias=False, kernel_regularizer=l2(weight_decay)),
+            Dense(
+                128,
+                use_bias=False,
+                kernel_regularizer=l2(config.cls_weight_decay),
+            ),
             BatchNormalization(),
             ReLU(),
         ]
 
         self.feature_extract = Sequential(base_layers)
-        self.final = Dense(num_classes, dtype="float32")
+        self.final = Dense(NUM_CLS, dtype="float32")
 
     def conv_block(self, out_channels: int) -> Sequential:
         """Return a convolution block with batch-norm and ReLU."""
@@ -62,7 +62,7 @@ class Classifier(Model):
                 strides=2,
                 use_bias=False,
                 padding="same",
-                kernel_regularizer=l2(self.weight_decay),
+                kernel_regularizer=l2(self.config.cls_weight_decay),
             ),
             BatchNormalization(),
             ReLU(),

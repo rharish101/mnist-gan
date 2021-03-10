@@ -7,10 +7,10 @@ from typing import Final
 from tensorflow.distribute import MirroredStrategy
 from tensorflow.keras.mixed_precision import set_global_policy
 
-from gan.data import IMG_SHAPE, NUM_CLS, get_dataset
+from gan.data import get_dataset
 from gan.models import Classifier
 from gan.training import ClassifierTrainer
-from gan.utils import setup_dirs
+from gan.utils import load_config, setup_dirs
 
 CONFIG: Final = "config-cls.yaml"
 
@@ -21,28 +21,31 @@ def main(args: Namespace) -> None:
     Arguments:
         args: The object containing the commandline arguments
     """
+    config = load_config(args.config)
+
     strategy = MirroredStrategy()
-    if args.mixed_precision:
+    if config.mixed_precision:
         set_global_policy("mixed_float16")
 
-    train_dataset, test_dataset = get_dataset(args.data_path, args.batch_size)
+    train_dataset, test_dataset = get_dataset(
+        args.data_path, config.cls_batch_size
+    )
 
     with strategy.scope():
-        model = Classifier(IMG_SHAPE, NUM_CLS, weight_decay=args.weight_decay)
+        model = Classifier(config)
 
     # Save each run into a directory by its timestamp.
     log_dir = setup_dirs(
         dirs=[args.save_dir],
         dirs_to_tstamp=[args.log_dir],
-        config=vars(args),
+        config=config,
         file_name=CONFIG,
     )[0]
 
-    trainer = ClassifierTrainer(model, strategy, lr=args.lr)
+    trainer = ClassifierTrainer(model, strategy, config=config)
     trainer.train(
         train_dataset,
         test_dataset,
-        epochs=args.epochs,
         log_dir=log_dir,
         record_eps=args.record_eps,
         save_dir=args.save_dir,
@@ -63,33 +66,10 @@ if __name__ == "__main__":
         help="path to the dataset",
     )
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=128,
-        help="the number of images in each batch",
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        default=1e-4,
-        help="learning rate for the optimization",
-    )
-    parser.add_argument(
-        "--weight-decay",
-        type=float,
-        default=2.5e-5,
-        help="L2 weight decay rate",
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=25,
-        help="the maximum number of epochs for training the classifier",
-    )
-    parser.add_argument(
-        "--mixed-precision",
-        action="store_true",
-        help="train with mixed-precision for higher performance",
+        "-c",
+        "--config",
+        type=Path,
+        help="Path to a YAML config containing hyper-parameter values",
     )
     parser.add_argument(
         "--save-dir",

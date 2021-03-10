@@ -13,7 +13,7 @@ from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tqdm import tqdm
 
 from ..evaluation import RunningFID
-from ..utils import get_grid, iterator_product, reduce_concat
+from ..utils import Config, get_grid, iterator_product, reduce_concat
 
 
 class GANTrainer:
@@ -30,10 +30,7 @@ class GANTrainer:
         crit_optim: The optimizer for the critic
         evaluator: The object that calculates the running FID
         writer: The summary writer to log TensorBoard summaries
-        batch_size: The global batch size
-        crit_steps: The number of critic steps per generator step
-        noise_dims: The dimensions for the inputs to the generator
-        gp_weight: Weights for the critic's gradient penalty
+        config: The hyper-param config
         save_dir: Directory where to store model weights
     """
 
@@ -48,17 +45,9 @@ class GANTrainer:
         strategy: Strategy,
         train_dataset: Dataset,
         val_dataset: Dataset,
-        batch_size: int,
-        crit_steps: int,
-        noise_dims: int,
-        gen_lr: float,
-        crit_lr: float,
-        decay_rate: float,
-        decay_steps: int,
-        gp_weight: float,
+        config: Config,
         log_dir: Path,
         save_dir: Path,
-        mixed_precision: bool = False,
     ):
         """Store main models and info required for training.
 
@@ -69,23 +58,15 @@ class GANTrainer:
             strategy: The distribution strategy for training the GAN
             train_dataset: The dataset of real images and labels for training
             val_dataset: The dataset of real images and labels for validation
-            batch_size: The global batch size
-            crit_steps: The number of critic steps per generator step
-            noise_dims: The dimensions for the inputs to the generator
-            gen_lr: The learning rate for the generator's optimizer
-            crit_lr: The learning rate for the critic's optimizer
-            decay_rate: The rate of exponential learning rate decay
-            decay_steps: The base steps for exponential learning rate decay
-            gp_weight: Weights for the critic's gradient penalty
+            config: The hyper-param config
             log_dir: Directory where to write event logs
             save_dir: Directory where to store model weights
-            mixed_precision: Whether to use mixed-precision for training
         """
         self.generator = generator
         self.critic = critic
 
         self.strategy = strategy
-        self.mixed_precision = mixed_precision
+        self.mixed_precision = config.mixed_precision
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -93,23 +74,21 @@ class GANTrainer:
         with strategy.scope():
 
             def get_lr_sched(lr):
-                return ExponentialDecay(lr, decay_steps, decay_rate)
+                return ExponentialDecay(
+                    lr, config.decay_steps, config.decay_rate
+                )
 
-            self.gen_optim = Adam(get_lr_sched(gen_lr), 0.5)
-            self.crit_optim = Adam(get_lr_sched(crit_lr), 0.5)
+            self.gen_optim = Adam(get_lr_sched(config.gen_lr), 0.5)
+            self.crit_optim = Adam(get_lr_sched(config.crit_lr), 0.5)
 
-        if mixed_precision:
+        if config.mixed_precision:
             self.gen_optim = LossScaleOptimizer(self.gen_optim)
             self.crit_optim = LossScaleOptimizer(self.crit_optim)
 
         self.evaluator = RunningFID(classifier)
         self.writer = tf.summary.create_file_writer(str(log_dir))
 
-        self.batch_size = batch_size
-        self.crit_steps = crit_steps
-        self.noise_dims = noise_dims
-        self.gp_weight = gp_weight
-
+        self.config = config
         self.save_dir = save_dir
 
     @tf.function
@@ -167,7 +146,7 @@ class GANTrainer:
         norm = tf.norm(flat_grads, axis=1)
         gp_batch = (norm - 1) ** 2
         return tf.nn.compute_average_loss(
-            gp_batch, global_batch_size=self.batch_size
+            gp_batch, global_batch_size=self.config.gan_batch_size
         )
 
     def _train_step(
@@ -184,7 +163,7 @@ class GANTrainer:
             The generated images
             The dictionary of losses, as required by `log_summaries`
         """
-        noise = tf.random.normal((real.get_shape()[0], self.noise_dims))
+        noise = tf.random.normal((real.get_shape()[0], self.config.noise_dims))
 
         with tf.GradientTape(persistent=True) as tape:
             crit_real_out = self.critic([real, labels], training=True)
@@ -195,7 +174,7 @@ class GANTrainer:
             # Wasserstein distance
             wass_loss = tf.nn.compute_average_loss(
                 crit_real_out - crit_fake_out,
-                global_batch_size=self.batch_size,
+                global_batch_size=self.config.gan_batch_size,
             )
             # Wasserstein Gradient Penalty
             grad_pen = self._gradient_penalty(real, generated, labels)
@@ -209,7 +188,9 @@ class GANTrainer:
             crit_reg = tf.nn.scale_regularization_loss(sum(self.critic.losses))
 
             gen_loss = wass_loss + gen_reg
-            crit_loss = -wass_loss + crit_reg + self.gp_weight * grad_pen
+            crit_loss = (
+                -wass_loss + crit_reg + self.config.gp_weight * grad_pen
+            )
 
         if train_gen:
             train_vars = self.generator.trainable_variables
@@ -256,7 +237,7 @@ class GANTrainer:
             The generated images
             The dictionary of losses, as required by `log_summaries`
         """
-        for _ in range(self.crit_steps):
+        for _ in range(self.config.crit_steps):
             self.strategy.run(self._train_step, args=(real, labels, False))
         gen, losses = self.strategy.run(
             self._train_step, args=(real, labels, True)
@@ -276,7 +257,7 @@ class GANTrainer:
         self.evaluator.reset()
 
         for real, lbls in self.val_dataset:
-            inputs = tf.random.normal((real.shape[0], self.noise_dims))
+            inputs = tf.random.normal((real.shape[0], self.config.noise_dims))
             generated = self.generator([inputs, lbls])
             self.evaluator.update(real, generated)
 
@@ -350,16 +331,11 @@ class GANTrainer:
             model.save_weights(self.save_dir / file_name)
 
     def train(
-        self,
-        epochs: int,
-        record_steps: int,
-        save_steps: int,
-        log_graph: bool = False,
+        self, record_steps: int, save_steps: int, log_graph: bool = False
     ) -> None:
         """Execute the training loops for the GAN.
 
         Args:
-            epochs: Number of epochs to train the GAN
             record_steps: Step interval for recording summaries
             save_steps: Step interval for saving the model
             log_graph: Whether to log the graph of the model
@@ -370,14 +346,16 @@ class GANTrainer:
             self.train_dataset
         )
         # Iterate over dataset in epochs
-        data_in_epochs = iterator_product(range(epochs), dataset)
+        data_in_epochs = iterator_product(
+            range(self.config.gan_epochs), dataset
+        )
 
         # Initialize all optimizer variables
         self._init_optim()
 
         for global_step, (_, (real, lbls)) in tqdm(
             enumerate(data_in_epochs, 1),
-            total=epochs * total_batches,
+            total=self.config.gan_epochs * total_batches,
             desc="Training",
         ):
             # The graph must be exported the first time the tf.function is run,

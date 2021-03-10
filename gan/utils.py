@@ -1,8 +1,9 @@
 """Utilities for the GAN."""
 import itertools
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Union
+from typing import Iterable, List, Optional, Union
 
 import tensorflow as tf
 import yaml
@@ -11,6 +12,47 @@ from tensorflow.distribute import Strategy
 from tensorflow.python.distribute.values import PerReplica
 
 DistTensor = Union[PerReplica, Tensor]
+
+
+@dataclass(frozen=True)
+class Config:
+    """Class to hold hyper-parameter configs.
+
+    Attributes:
+        gan_batch_size: The global batch size for the GAN
+        cls_batch_size: The global batch size for the classifier
+        noise_dims: The dimensions for the inputs to the generator
+        gen_lr: The learning rate for the generator's optimizer
+        crit_lr: The learning rate for the critic's optimizer
+        cls_lr: The learning rate for the classifier's optimizer
+        decay_rate: The rate of exponential learning rate decay
+        decay_steps: The base steps for exponential learning rate decay
+        gp_weight: Weights for the critic's gradient penalty
+        gen_weight_decay: The decay for L2 regularization in the generator
+        crit_weight_decay: The decay for L2 regularization in the critic
+        cls_weight_decay: The decay for L2 regularization in the classifier
+        crit_steps: The number of critic steps per generator step
+        gan_epochs: Number of epochs to train the GAN
+        cls_epochs: Number of epochs to train the classifier
+        mixed_precision: Whether to use mixed-precision for training
+    """
+
+    gan_batch_size: int = 128
+    cls_batch_size: int = 128
+    noise_dims: int = 100
+    gen_lr: float = 1e-4
+    crit_lr: float = 1e-4
+    cls_lr: float = 1e-4
+    decay_rate: float = 0.8
+    decay_steps: int = 3000
+    gp_weight: float = 10.0
+    gen_weight_decay: float = 2.5e-5
+    crit_weight_decay: float = 2.5e-5
+    cls_weight_decay: float = 2.5e-5
+    crit_steps: int = 1
+    gan_epochs: int = 40
+    cls_epochs: int = 25
+    mixed_precision: bool = False
 
 
 @tf.function
@@ -89,7 +131,7 @@ def get_grid(img: Tensor) -> Tensor:
 
 def setup_dirs(
     dirs: List[Path],
-    config: Dict[str, Any],
+    config: Config,
     file_name: str,
     dirs_to_tstamp: List[Path] = [],
 ) -> List[Path]:
@@ -100,7 +142,7 @@ def setup_dirs(
 
     Args:
         dirs: The directories to be setup
-        config: The config that is to be dumped
+        config: The hyper-param config that is to be dumped
         file_name: The file name for the config
         dirs_to_tstamp: The directories for timestamping
 
@@ -118,7 +160,7 @@ def setup_dirs(
         if not directory.exists():
             directory.mkdir(parents=True)
         with open(directory / file_name, "w") as conf:
-            yaml.dump(config, conf)
+            yaml.dump(vars(config), conf)
 
     return tstamped_dirs
 
@@ -160,3 +202,16 @@ def reduce_concat(strategy: Strategy, dist_tensor: DistTensor) -> Tensor:
         return tf.concat(dist_tensor.values, axis=0)
     else:
         return dist_tensor
+
+
+def load_config(config_path: Optional[Path]) -> Config:
+    """Load the hyper-param config at the given path.
+
+    If the path doesn't exist, then an empty dict is returned.
+    """
+    if config_path is not None and config_path.exists():
+        with open(config_path, "r") as f:
+            args = yaml.safe_load(f)
+    else:
+        args = {}
+    return Config(**args)

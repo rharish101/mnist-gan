@@ -19,6 +19,9 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.regularizers import l2
 
+from ..data import IMG_SHAPE, NUM_CLS
+from ..utils import Config
+
 # The type of an input shape spec for a Keras layer
 Shape = Union[Tuple[int, ...], TensorShape]
 
@@ -84,18 +87,17 @@ class Conditioning(Layer):
         weight_decay: The decay for L2 regularization
     """
 
-    def __init__(self, num_classes: int, weight_decay: float = 0):
+    def __init__(self, weight_decay: float = 0):
         """Store weight decay."""
         super().__init__()
         self.weight_decay = weight_decay
-        self.num_classes = num_classes
 
     def build(self, input_shape: Tuple[Shape, Shape]) -> None:
         """Initialize the Conv2DTranspose and Embedding layers."""
         tensor_shape, _ = input_shape
         flat_dim = tensor_shape[1] * tensor_shape[2] * tensor_shape[3]
         self.embed = Embedding(
-            self.num_classes,
+            NUM_CLS,
             flat_dim,
             input_length=1,
             embeddings_regularizer=l2(self.weight_decay),
@@ -118,28 +120,23 @@ class Conditioning(Layer):
         return tensor + labels_cond
 
 
-def get_generator(
-    noise_dims: int, num_classes: int, img_ch: int, weight_decay: float = 0
-) -> Model:
+def get_generator(config: Config) -> Model:
     """Return the generator model.
 
     Args:
-        noise_dims: The dimensions of the random noise
-        num_classes: The number of classes in the dataset
-        img_ch: The number of channels needed in the output image
-        weight_decay: The decay for L2 regularization
+        config: The hyper-param config
 
     Returns:
         The generator model
     """
-    noise = Input(shape=[noise_dims])
+    noise = Input(shape=[config.noise_dims])
     labels = Input(shape=[])
 
     cond = Embedding(
-        num_classes,
+        NUM_CLS,
         64,
         input_length=1,
-        embeddings_regularizer=l2(weight_decay),
+        embeddings_regularizer=l2(config.gen_weight_decay),
     )(labels)
     x = Concatenate(axis=-1)([noise, cond])
     x = Reshape([1, 1, x.shape[-1]])(x)
@@ -154,7 +151,7 @@ def get_generator(
             padding="valid" if first else "same",
             activation="tanh" if last else None,
             use_bias=True if last else False,
-            kernel_regularizer=l2(weight_decay),
+            kernel_regularizer=l2(config.gen_weight_decay),
             dtype="float32" if last else None,
         )(inputs)
         if not last:
@@ -166,29 +163,23 @@ def get_generator(
     x = conv_t_block(x, 256)
     x = conv_t_block(x, 128)
     x = conv_t_block(x, 64)
-    outputs = conv_t_block(x, 1, last=True)
+    outputs = conv_t_block(x, IMG_SHAPE[-1], last=True)
 
     return Model(inputs=[noise, labels], outputs=outputs)
 
 
-def get_critic(
-    input_shape: Tuple[int, int, int],
-    num_classes: int,
-    weight_decay: float = 0,
-) -> Model:
+def get_critic(config: Config) -> Model:
     """Return the critic model.
 
     Args:
-        input_shape: The shape of the input images excluding the batch size
-        num_classes: The number of classes in the dataset
-        weight_decay: The decay for L2 regularization
+        config: The hyper-param config
 
     Returns:
         The critic model
     """
     SpectralConv2D = spectralize(Conv2D)
 
-    inputs = Input(shape=input_shape)
+    inputs = Input(shape=IMG_SHAPE)
     labels = Input(shape=[])
 
     def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
@@ -198,10 +189,10 @@ def get_critic(
             strides=2,
             padding="same",
             use_bias=False,
-            kernel_regularizer=l2(weight_decay),
-            input_shape=input_shape,
+            kernel_regularizer=l2(config.crit_weight_decay),
+            input_shape=IMG_SHAPE,
         )(inputs)
-        x = Conditioning(num_classes, weight_decay)((x, labels))
+        x = Conditioning(config.crit_weight_decay)((x, labels))
         if norm:
             x = LayerNormalization()(x)
         x = LeakyReLU(alpha=0.2)(x)
@@ -218,7 +209,7 @@ def get_critic(
         strides=1,
         padding="valid",
         use_bias=True,
-        kernel_regularizer=l2(weight_decay),
+        kernel_regularizer=l2(config.crit_weight_decay),
         dtype="float32",
     )(x)
 

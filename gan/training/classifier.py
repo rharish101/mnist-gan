@@ -9,46 +9,42 @@ from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
+from ..utils import Config
+
 
 class ClassifierTrainer:
     """Class for training the classifier.
 
     Attributes:
         model: The classifier model being trained
+        config: The hyper-param config
     """
 
     CLS_PATH: Final = "classifier.ckpt"
 
-    def __init__(
-        self,
-        model: Model,
-        strategy: Strategy,
-        lr: float,
-        mixed_precision: bool = False,
-    ):
+    def __init__(self, model: Model, strategy: Strategy, config: Config):
         """Store the main model and other required info.
 
         Args:
             model: The classifier model to be trained
             strategy: The distribution strategy for training the model
-            lr: The learning rate for Adam
-            mixed_precision: Whether to use mixed-precision for training
+            config: The hyper-param config
         """
         with strategy.scope():
             # Takes care of mixed-precision by itself
             model.compile(
-                optimizer=Adam(lr),
+                optimizer=Adam(config.cls_lr),
                 loss=SparseCategoricalCrossentropy(from_logits=True),
                 metrics=["accuracy"],
             )
 
         self.model = model
+        self.config = config
 
     def train(
         self,
         train_dataset: Dataset,
         val_dataset: Dataset,
-        epochs: int,
         log_dir: Path,
         record_eps: int,
         save_dir: Path,
@@ -60,7 +56,6 @@ class ClassifierTrainer:
         Args:
             train_dataset: The training dataset
             val_dataset: The validation dataset
-            epochs: Maximum number of epochs to train the classifier
             log_dir: Directory where to log summaries
             record_eps: Epoch interval for recording summaries
             save_dir: Directory where to store model weights
@@ -85,7 +80,7 @@ class ClassifierTrainer:
 
         self.model.fit(
             train_dataset,
-            epochs=epochs,
+            epochs=self.config.cls_epochs,
             callbacks=[logger, saver],
             validation_data=val_dataset,
             shuffle=False,  # already done during dataset creation

@@ -5,29 +5,31 @@ import tensorflow as tf
 from tensorflow.keras import Model
 from tqdm import tqdm
 
+from ..utils import Config
+
 
 class GANEvaluator:
     """Class to generate images using a GAN.
 
     Attributes:
         generator: The generator model to be evaluated
-        noise_dims: The dimensions for the inputs to the generator
+        config: The hyper-param config
     """
 
-    def __init__(self, generator: Model, noise_dims: int):
+    def __init__(self, generator: Model, config: Config):
         """Store the required objects and info.
 
         Args:
             generator: The generator model to be evaluated
-            noise_dims: The dimensions for the inputs to the generator
+            config: The hyper-param config
         """
         self.generator = generator
-        self.noise_dims = noise_dims
+        self.config = config
 
     @tf.function
     def _gen_img(self, digits: tf.Tensor) -> tf.Tensor:
         """Generate images of the requested digits."""
-        noise = tf.random.normal([digits.shape[0], self.noise_dims])
+        noise = tf.random.normal([digits.shape[0], self.config.noise_dims])
         label = tf.convert_to_tensor(digits)
         generated = self.generator([noise, label])
 
@@ -40,14 +42,11 @@ class GANEvaluator:
             tf.io.encode_jpeg, outputs, fn_output_signature=tf.string
         )
 
-    def generate(
-        self, imgs_per_digit: int, batch_size: int, output_dir: Path
-    ) -> None:
+    def generate(self, imgs_per_digit: int, output_dir: Path) -> None:
         """Generate the digits and save them to disk.
 
         Args:
             imgs_per_digit: The total number of images to generate per digit
-            batch_size: The number of images in each batch of generation
             output_dir: Where to save the generated images
         """
         total_imgs = 10 * imgs_per_digit
@@ -56,8 +55,8 @@ class GANEvaluator:
             output_dir.mkdir(parents=True)
 
         with tqdm(total=total_imgs, desc="Saving") as pbar:
-            for start in range(0, total_imgs, batch_size):
-                end = min(total_imgs, start + batch_size)
+            for start in range(0, total_imgs, self.config.gan_batch_size):
+                end = min(total_imgs, start + self.config.gan_batch_size)
                 digits = tf.convert_to_tensor(
                     [i % 10 for i in range(start, end)]
                 )

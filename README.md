@@ -12,10 +12,6 @@ For viewing the list of all positional and optional arguments for any script, ty
 ./script.py --help
 ```
 
-All hyper-parameters for the models are specified through the CLI.
-To view the default hyper-parameters, use the `-h` or `--help` flags for a script.
-The default values should be in parentheses next to the descriptions of the CLI options.
-
 ### Setup
 [Poetry](https://python-poetry.org/) is used for conveniently installing and managing dependencies.
 
@@ -66,6 +62,19 @@ Thus, this needs to be set up only when one intends to commit changes to git.
 **NOTE**: You need to be inside the virtual environment where you installed the above dependencies every time you commit.
 However, this is not required if you have installed pre-commit globally.
 
+### Hyper-Parameter Configuration
+Hyper-parameters can be specified through YAML configs.
+For example, to specify a batch size of 32 for the GAN and a learning rate of 0.001 for the generator, use the following config:
+```yaml
+gan_batch_size: 32
+gen_lr: 0.001
+```
+
+You can store configs in a directory named `configs` located in the root of this repository.
+It has an entry in the [`.gitignore`](./.gitignore) file so that custom configs aren't picked up by git.
+
+The available hyper-parameters, their documentation and default values are specified in the `Config` class in the file [`gan/utils.py`](./gan/utils.py).
+
 ### Training
 The GAN uses [Frechet Inception Distance](https://arxiv.org/abs/1706.08500) for evaluating its performance during training time.
 For this, we need to train a classifier before training the GAN.
@@ -86,7 +95,7 @@ By default, this directory is `checkpoints` for both the classifier and the GAN.
 Training logs are by default stored inside an ISO 8601 timestamp named subdirectory, which is stored in a parent directory (as given by the `--log-dir` argument).
 By default, this directory is `logs/classifier` for classifier, and `logs/gan` for the GAN.
 
-Copies of the CLI arguments are saved as a YAML file in both the model checkpoint directory and the timestamped log directory.
+The hyper-parameter config is saved as a YAML file in both the model checkpoint directory and the timestamped log directory.
 For the classifier, it is named `config-cls.yaml`, and for the GAN, it is named `config-gan.yaml`.
 
 #### Multi-GPU Training
@@ -108,9 +117,9 @@ TF_FORCE_GPU_ALLOW_GROWTH=true ./script.py
 
 #### Mixed Precision Training
 This implementation supports mixed-precision training.
-This can be enabled using the `--mixed-precision` CLI flag, as follows:
-```sh
-./script.py --mixed-precision
+This can be enabled by setting the `mixed_precision` hyper-parameter in a config, as follows:
+```yaml
+mixed_precision: true
 ```
 
 Note that this will only provide significant speed-ups if your GPU(s) have special support for mixed-precision compute.

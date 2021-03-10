@@ -149,9 +149,11 @@ def setup_dirs(
     Returns:
         The list of created timestamped directories, if any
     """
+    curr_date = datetime.now().astimezone()
+
     tstamped_dirs = []
     for directory in dirs_to_tstamp:
-        time_stamp = datetime.now().isoformat()
+        time_stamp = curr_date.isoformat()
         new_dir = directory / time_stamp
         tstamped_dirs.append(new_dir)
 

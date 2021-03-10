@@ -9,7 +9,7 @@ license = "MIT"
 python = ">=3.8"
 tensorflow = "^2.4.0"
 tqdm = "^4.55.1"
-PyYAML = "^5.3.1"
+toml = "^0.10.2"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "^2.9.3"

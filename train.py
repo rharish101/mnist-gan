@@ -12,7 +12,7 @@ from gan.models import Classifier, get_critic, get_generator
 from gan.training import ClassifierTrainer, GANTrainer
 from gan.utils import load_config, setup_dirs
 
-CONFIG: Final = "config-gan.yaml"
+CONFIG: Final = "config-gan.toml"
 
 
 def main(args: Namespace) -> None:
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "-c",
         "--config",
         type=Path,
-        help="Path to a YAML config containing hyper-parameter values",
+        help="Path to a TOML config containing hyper-parameter values",
     )
     parser.add_argument(
         "--load-dir",

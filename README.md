@@ -63,11 +63,11 @@ Thus, this needs to be set up only when one intends to commit changes to git.
 However, this is not required if you have installed pre-commit globally.
 
 ### Hyper-Parameter Configuration
-Hyper-parameters can be specified through YAML configs.
+Hyper-parameters can be specified through [TOML](https://toml.io/en/) configs.
 For example, to specify a batch size of 32 for the GAN and a learning rate of 0.001 for the generator, use the following config:
-```yaml
-gan_batch_size: 32
-gen_lr: 0.001
+```toml
+gan_batch_size = 32
+gen_lr = 0.001
 ```
 
 You can store configs in a directory named `configs` located in the root of this repository.
@@ -95,8 +95,8 @@ By default, this directory is `checkpoints` for both the classifier and the GAN.
 Training logs are by default stored inside an ISO 8601 timestamp named subdirectory, which is stored in a parent directory (as given by the `--log-dir` argument).
 By default, this directory is `logs/classifier` for classifier, and `logs/gan` for the GAN.
 
-The hyper-parameter config, along with the current date and time, is saved as a YAML file in both the model checkpoint directory and the timestamped log directory.
-For the classifier, it is named `config-cls.yaml`, and for the GAN, it is named `config-gan.yaml`.
+The hyper-parameter config, along with the current date and time, is saved as a TOML file in both the model checkpoint directory and the timestamped log directory.
+For the classifier, it is named `config-cls.toml`, and for the GAN, it is named `config-gan.toml`.
 
 #### Multi-GPU Training
 This implementation supports multi-GPU training on a single machine for both the classifier and the GAN using TensorFlow's [`tf.distribute.MirroredStrategy`](https://www.tensorflow.org/tutorials/distribute/custom_training#create_a_strategy_to_distribute_the_variables_and_the_graph).
@@ -118,8 +118,8 @@ TF_FORCE_GPU_ALLOW_GROWTH=true ./script.py
 #### Mixed Precision Training
 This implementation supports mixed-precision training.
 This can be enabled by setting the `mixed_precision` hyper-parameter in a config, as follows:
-```yaml
-mixed_precision: true
+```toml
+mixed_precision = true
 ```
 
 Note that this will only provide significant speed-ups if your GPU(s) have special support for mixed-precision compute.

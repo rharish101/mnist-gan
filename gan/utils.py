@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Union
 
 import tensorflow as tf
-import yaml
+import toml
 from tensorflow import Tensor
 from tensorflow.distribute import Strategy
 from tensorflow.python.distribute.values import PerReplica
@@ -164,7 +164,7 @@ def setup_dirs(
         if not directory.exists():
             directory.mkdir(parents=True)
         with open(directory / file_name, "w") as conf:
-            yaml.dump(to_dump, conf)
+            toml.dump(to_dump, conf)
 
     return tstamped_dirs
 
@@ -215,7 +215,7 @@ def load_config(config_path: Optional[Path]) -> Config:
     """
     if config_path is not None and config_path.exists():
         with open(config_path, "r") as f:
-            args = yaml.safe_load(f)
+            args = toml.load(f)
     else:
         args = {}
     return Config(**args)

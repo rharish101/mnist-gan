@@ -3,7 +3,7 @@ import itertools
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional, Union
+from typing import List, Optional, Union
 
 import tensorflow as tf
 import toml
@@ -167,27 +167,6 @@ def setup_dirs(
             toml.dump(to_dump, conf)
 
     return tstamped_dirs
-
-
-def iterator_product(*args: Iterable) -> Iterable:
-    """Return the cartesian product of given iterators.
-
-    This works similar to `itertools.product`, but without duplicating
-    stuff in memory. This notably happens when using TensorFlow datasets.
-    """
-    if len(args) == 0:
-        raise ValueError("At least one iterator must be given")
-
-    for i in args[0]:
-        if len(args) == 1:
-            yield i
-            continue
-
-        for j in iterator_product(*args[1:]):
-            if len(args) > 2:
-                yield (i, *j)
-            else:
-                yield i, j
 
 
 def reduce_concat(strategy: Strategy, dist_tensor: DistTensor) -> Tensor:

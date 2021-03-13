@@ -13,7 +13,7 @@ from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tqdm import tqdm
 
 from ..evaluation import RunningFID
-from ..utils import Config, get_grid, iterator_product, reduce_concat
+from ..utils import Config, get_grid, reduce_concat
 
 _Losses = Dict[str, Tensor]
 
@@ -384,14 +384,14 @@ class GANTrainer:
             self.train_dataset
         )
         # Iterate over dataset in epochs
-        data_in_epochs = iterator_product(
-            range(self.config.gan_epochs), dataset
+        data_in_epochs = (
+            item for epoch in range(self.config.gan_epochs) for item in dataset
         )
 
         # Initialize all optimizer variables
         self._init_optim()
 
-        for global_step, (_, (real, lbls)) in tqdm(
+        for global_step, (real, lbls) in tqdm(
             enumerate(data_in_epochs, 1),
             total=self.config.gan_epochs * total_batches,
             desc="Training",

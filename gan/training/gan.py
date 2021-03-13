@@ -1,19 +1,21 @@
 """Class for training the GAN."""
 from pathlib import Path
-from typing import Dict, Final, Tuple
+from typing import Dict, Final, List, Tuple
 
 import tensorflow as tf
-from tensorflow import Tensor
+from tensorflow import Tensor, Variable
 from tensorflow.data import Dataset
 from tensorflow.distribute import ReduceOp, Strategy
 from tensorflow.keras import Model
 from tensorflow.keras.mixed_precision import LossScaleOptimizer
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, Optimizer
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tqdm import tqdm
 
 from ..evaluation import RunningFID
 from ..utils import Config, get_grid, iterator_product, reduce_concat
+
+_Losses = Dict[str, Tensor]
 
 
 class GANTrainer:
@@ -116,6 +118,37 @@ class GANTrainer:
 
         self.strategy.run(create_vars, args=tuple())
 
+    def _get_losses(
+        self,
+        real: Tensor,
+        generated: Tensor,
+        labels: Tensor,
+        crit_real_out: Tensor,
+        crit_fake_out: Tensor,
+    ) -> _Losses:
+        """Get the dictionary of losses, as required by `log_summaries`."""
+        losses = {}
+
+        # Wasserstein distance
+        losses["wass"] = tf.nn.compute_average_loss(
+            crit_real_out - crit_fake_out,
+            global_batch_size=self.config.gan_batch_size,
+        )
+        # Wasserstein Gradient Penalty
+        losses["grad_pen"] = self._gradient_penalty(real, generated, labels)
+
+        # Regularization losses
+        # NOTE: Regularization needs to be scaled by the number of GPUs in
+        # the strategy, as gradients will be added.
+        losses["gen_reg"] = tf.nn.scale_regularization_loss(
+            sum(self.generator.losses)
+        )
+        losses["crit_reg"] = tf.nn.scale_regularization_loss(
+            sum(self.critic.losses)
+        )
+
+        return losses
+
     def _gradient_penalty(
         self, real: Tensor, generated: Tensor, labels: Tensor
     ) -> Tensor:
@@ -149,58 +182,14 @@ class GANTrainer:
             gp_batch, global_batch_size=self.config.gan_batch_size
         )
 
-    def _train_step(
-        self, real: Tensor, labels: Tensor, train_gen: bool
-    ) -> Tuple[Tensor, Dict[str, Tensor]]:
-        """Run a single training step on a single GPU.
-
-        Args:
-            real: The input real images
-            labels: The corresponding input labels
-            train_gen: Whether to train the generator or train the critic
-
-        Returns:
-            The generated images
-            The dictionary of losses, as required by `log_summaries`
-        """
-        noise = tf.random.normal((real.get_shape()[0], self.config.noise_dims))
-
-        with tf.GradientTape(persistent=True) as tape:
-            crit_real_out = self.critic([real, labels], training=True)
-
-            generated = self.generator([noise, labels], training=True)
-            crit_fake_out = self.critic([generated, labels], training=True)
-
-            # Wasserstein distance
-            wass_loss = tf.nn.compute_average_loss(
-                crit_real_out - crit_fake_out,
-                global_batch_size=self.config.gan_batch_size,
-            )
-            # Wasserstein Gradient Penalty
-            grad_pen = self._gradient_penalty(real, generated, labels)
-
-            # Regularization losses
-            # NOTE: Regularization needs to be scaled by the number of GPUs in
-            # the strategy, as gradients will be added.
-            gen_reg = tf.nn.scale_regularization_loss(
-                sum(self.generator.losses)
-            )
-            crit_reg = tf.nn.scale_regularization_loss(sum(self.critic.losses))
-
-            gen_loss = wass_loss + gen_reg
-            crit_loss = (
-                -wass_loss + crit_reg + self.config.gp_weight * grad_pen
-            )
-
-        if train_gen:
-            train_vars = self.generator.trainable_variables
-            loss = gen_loss
-            optim = self.gen_optim
-        else:
-            train_vars = self.critic.trainable_variables
-            loss = crit_loss
-            optim = self.crit_optim
-
+    def _optimize(
+        self,
+        train_vars: List[Variable],
+        loss: Tensor,
+        optim: Optimizer,
+        tape: tf.GradientTape,
+    ) -> None:
+        """Optimize the variables."""
         if self.mixed_precision:
             loss = optim.get_scaled_loss(loss)
         grads = tape.gradient(loss, train_vars)
@@ -208,26 +197,37 @@ class GANTrainer:
             grads = optim.get_unscaled_gradients(grads)
         optim.apply_gradients(zip(grads, train_vars))
 
-        # Losses required for logging summaries
-        losses = {
-            "wass": wass_loss,
-            "grad_pen": grad_pen,
-            "gen_reg": gen_reg,
-            "crit_reg": crit_reg,
-        }
+    def _train_step_critic(
+        self, real: Tensor, generated: Tensor, labels: Tensor
+    ) -> None:
+        """Run a single training step for the critic on a single GPU."""
+        with tf.GradientTape() as crit_tape:
+            crit_real_out = self.critic([real, labels], training=True)
+            crit_fake_out = self.critic([generated, labels], training=True)
 
-        # Returned values are used for logging summaries
-        return generated, losses
+            losses = self._get_losses(
+                real, generated, labels, crit_real_out, crit_fake_out
+            )
+            crit_loss = (
+                -losses["wass"]
+                + losses["crit_reg"]
+                + self.config.gp_weight * losses["grad_pen"]
+            )
 
-    @tf.function
-    def train_step(
+        self._optimize(
+            self.critic.trainable_variables,
+            crit_loss,
+            self.crit_optim,
+            crit_tape,
+        )
+
+    def _train_step(
         self, real: Tensor, labels: Tensor
-    ) -> Tuple[Tensor, Dict[str, Tensor]]:
-        """Run a single training step, distributing across all GPUs.
+    ) -> Tuple[Tensor, _Losses]:
+        """Run a single training step on a single GPU.
 
         This training step will train the critic for the required number of
-        steps as well as train the generator for a single step. The returned
-        dict of losses are used for logging summaries.
+        steps as well as train the generator for a single step.
 
         Args:
             real: The input real images
@@ -237,11 +237,49 @@ class GANTrainer:
             The generated images
             The dictionary of losses, as required by `log_summaries`
         """
-        for _ in range(self.config.crit_steps):
-            self.strategy.run(self._train_step, args=(real, labels, False))
-        gen, losses = self.strategy.run(
-            self._train_step, args=(real, labels, True)
+        noise = tf.random.normal((real.get_shape()[0], self.config.noise_dims))
+
+        with tf.GradientTape() as gen_tape:
+            generated = self.generator([noise, labels], training=True)
+
+            # No need to calculate gradients of critic optimization
+            with gen_tape.stop_recording():
+                for _ in range(self.config.crit_steps):
+                    self._train_step_critic(real, generated, labels)
+
+            crit_real_out = self.critic([real, labels], training=True)
+            crit_fake_out = self.critic([generated, labels], training=True)
+
+            losses = self._get_losses(
+                real, generated, labels, crit_real_out, crit_fake_out
+            )
+            gen_loss = losses["wass"] + losses["gen_reg"]
+
+        self._optimize(
+            self.generator.trainable_variables,
+            gen_loss,
+            self.gen_optim,
+            gen_tape,
         )
+
+        # Returned values are used for logging summaries
+        return generated, losses
+
+    @tf.function
+    def train_step(
+        self, real: Tensor, labels: Tensor
+    ) -> Tuple[Tensor, _Losses]:
+        """Run a single training step, distributing across all GPUs.
+
+        Args:
+            real: The input real images
+            labels: The corresponding input labels
+
+        Returns:
+            The generated images
+            The dictionary of losses, as required by `log_summaries`
+        """
+        gen, losses = self.strategy.run(self._train_step, args=(real, labels))
 
         gen = reduce_concat(self.strategy, gen)
         # Sum losses across all GPUs
@@ -267,7 +305,7 @@ class GANTrainer:
         self,
         real: Tensor,
         generated: Tensor,
-        losses: Dict[str, Tensor],
+        losses: _Losses,
         global_step: int,
     ) -> None:
         """Log summaries to disk.

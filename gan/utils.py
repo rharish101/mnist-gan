@@ -35,6 +35,7 @@ class Config:
         gan_epochs: Number of epochs to train the GAN
         cls_epochs: Number of epochs to train the classifier
         mixed_precision: Whether to use mixed-precision for training
+        power_iter: The number of iterations of the power method
     """
 
     gan_batch_size: int = 128
@@ -53,6 +54,7 @@ class Config:
     gan_epochs: int = 40
     cls_epochs: int = 25
     mixed_precision: bool = False
+    power_iter: int = 1
 
 
 @tf.function

@@ -31,24 +31,30 @@ class SpectralNorm(Constraint):
 
     Attributes:
         v: The variable for the power method
+        iterations: The number of iterations of the power method
     """
 
-    def __init__(self, dim: int):
+    def __init__(self, dim: int, iterations: int = 1):
         """Initialize the variable for the power method.
 
         Args:
             dim: The size of the last dimension of the weights (along which
                 spectral normalization will be applied)
+            iterations: The number of iterations of the power method
         """
         self.v = tf.Variable(tf.random.normal((dim, 1)), trainable=False)
+        self.iterations = iterations
 
     def __call__(self, weights: Tensor) -> Tensor:
         """Normalize the weights by its spectral norm."""
         # For Conv kernels, the last layer will be the output channels.
         # Therefore, (H, W, C_in, C_out) -> (H * W * C_in, C_out)
         w = tf.reshape(weights, (-1, weights.shape[-1]))
-        u = tf.linalg.normalize(w @ self.v)[0]
-        v = tf.linalg.normalize(tf.transpose(w) @ u)[0]
+        v = self.v
+
+        for _ in range(self.iterations):
+            u = tf.linalg.normalize(w @ v)[0]
+            v = tf.linalg.normalize(tf.transpose(w) @ u)[0]
 
         self.v.assign(tf.cast(v, self.v.dtype))
         spectral_norm = tf.transpose(u) @ w @ v
@@ -68,13 +74,13 @@ class Conditioning(Layer):
 
     Attributes:
         embed: The core embedding layer
-        weight_decay: The decay for L2 regularization
+        config: The hyper-param config
     """
 
-    def __init__(self, weight_decay: float = 0):
-        """Store weight decay."""
+    def __init__(self, config: Config):
+        """Store the hyper-param config."""
         super().__init__()
-        self.weight_decay = weight_decay
+        self.config = config
 
     def build(self, input_shape: Tuple[Shape, Shape]) -> None:
         """Initialize the Conv2DTranspose and Embedding layers."""
@@ -84,8 +90,10 @@ class Conditioning(Layer):
             NUM_CLS,
             flat_dim,
             input_length=1,
-            embeddings_regularizer=l2(self.weight_decay),
-            embeddings_constraint=SpectralNorm(flat_dim),
+            embeddings_regularizer=l2(self.config.crit_weight_decay),
+            embeddings_constraint=SpectralNorm(
+                flat_dim, iterations=self.config.power_iter
+            ),
         )
 
     def call(self, inputs: Tuple[Tensor, Tensor]) -> Tensor:
@@ -175,7 +183,7 @@ def get_critic(config: Config) -> Model:
             kernel_regularizer=l2(config.crit_weight_decay),
             kernel_constraint=SpectralNorm(filters),
         )(inputs)
-        x = Conditioning(config.crit_weight_decay)((x, labels))
+        x = Conditioning(config)((x, labels))
         if norm:
             x = LayerNormalization()(x)
         x = LeakyReLU(alpha=0.2)(x)

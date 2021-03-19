@@ -85,6 +85,7 @@ class Conditioning(Layer):
             flat_dim,
             input_length=1,
             embeddings_regularizer=l2(self.weight_decay),
+            embeddings_constraint=SpectralNorm(flat_dim),
         )
 
     def call(self, inputs: Tuple[Tensor, Tensor]) -> Tensor:

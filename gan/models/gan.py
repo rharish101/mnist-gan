@@ -1,10 +1,10 @@
 """Generator and critic network models."""
-from typing import Tuple, Type, Union
+from typing import Tuple, Union
 
 import tensorflow as tf
-from tensorflow import Tensor, TensorShape, Variable
+from tensorflow import Tensor, TensorShape
 from tensorflow.keras import Input, Model
-from tensorflow.keras.initializers import RandomNormal
+from tensorflow.keras.constraints import Constraint
 from tensorflow.keras.layers import (
     BatchNormalization,
     Concatenate,
@@ -26,53 +26,37 @@ from ..utils import Config
 Shape = Union[Tuple[int, ...], TensorShape]
 
 
-def spectralize(layer: Type[Layer]) -> Type[Layer]:  # noqa: D202
-    """Return a class with spectral normalization over the kernel.
+class SpectralNorm(Constraint):
+    """Constraint the weights to have unit spectral norm.
 
-    This will require that the given layer should have a "kernel" attribute.
+    Attributes:
+        v: The variable for the power method
     """
 
-    class SpectralLayer(layer):  # type: ignore
-        def build(self, input_shape: Shape) -> None:
-            """Initialize the vector for the power iteration method."""
-            super().build(input_shape)
-            # For Conv kernels, the last layer will be the output channels.
-            # Therefore, (H, W, C_in, C_out) -> (H * W * C_in, C_out)
-            dim = self.kernel.shape[:-1].num_elements()
-            self.u = self.add_weight(
-                name="u",
-                shape=(dim, 1),
-                dtype=self.kernel.dtype,
-                initializer=RandomNormal,
-                trainable=False,
-            )
+    def __init__(self, dim: int):
+        """Initialize the variable for the power method.
 
-        @tf.function
-        def _spectral_norm(
-            self, weights: Variable, training: bool = False
-        ) -> Tensor:
-            # For Conv kernels, the last layer will be the output channels.
-            # Therefore, (H, W, C_in, C_out) -> (H * W * C_in, C_out)
-            w = tf.reshape(weights, (-1, weights.shape[-1]))
-            v = tf.linalg.normalize(tf.matmul(tf.transpose(w), self.u))[0]
-            u = tf.linalg.normalize(tf.matmul(w, v))[0]
-            if training:
-                self.u.assign(tf.cast(u, self.u.dtype))
+        Args:
+            dim: The size of the last dimension of the weights (along which
+                spectral normalization will be applied)
+        """
+        self.v = tf.Variable(tf.random.normal((dim, 1)), trainable=False)
 
-            u = tf.stop_gradient(u)
-            v = tf.stop_gradient(v)
-            spec_norm = tf.matmul(tf.matmul(tf.transpose(u), w), v)
-            return spec_norm
+    def __call__(self, weights: Tensor) -> Tensor:
+        """Normalize the weights by its spectral norm."""
+        # For Conv kernels, the last layer will be the output channels.
+        # Therefore, (H, W, C_in, C_out) -> (H * W * C_in, C_out)
+        w = tf.reshape(weights, (-1, weights.shape[-1]))
+        u = tf.linalg.normalize(w @ self.v)[0]
+        v = tf.linalg.normalize(tf.transpose(w) @ u)[0]
 
-        def call(self, inputs: Tensor, training: bool = False) -> Tensor:
-            """Perform spectral normalization before calling the layer."""
-            spec_norm = self._spectral_norm(self.kernel, training=training)
-            self.kernel.assign(
-                tf.cast(self.kernel / spec_norm, self.kernel.dtype)
-            )
-            return super().call(inputs)
+        self.v.assign(tf.cast(v, self.v.dtype))
+        spectral_norm = tf.transpose(u) @ w @ v
+        return weights / spectral_norm
 
-    return SpectralLayer
+    def get_config(self):
+        """Get the config for this constraint."""
+        return {"dimensions": self.v.shape[0], "iterations": self.iterations}
 
 
 class Conditioning(Layer):
@@ -177,20 +161,18 @@ def get_critic(config: Config) -> Model:
     Returns:
         The critic model
     """
-    SpectralConv2D = spectralize(Conv2D)
-
     inputs = Input(shape=IMG_SHAPE)
     labels = Input(shape=[])
 
     def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
-        x = SpectralConv2D(
+        x = Conv2D(
             filters,
-            4,
+            kernel_size=4,
             strides=2,
             padding="same",
             use_bias=False,
             kernel_regularizer=l2(config.crit_weight_decay),
-            input_shape=IMG_SHAPE,
+            kernel_constraint=SpectralNorm(filters),
         )(inputs)
         x = Conditioning(config.crit_weight_decay)((x, labels))
         if norm:
@@ -203,13 +185,14 @@ def get_critic(config: Config) -> Model:
     x = conv_block(x, 256)
     x = conv_block(x, 512)
 
-    outputs = SpectralConv2D(
+    outputs = Conv2D(
         filters=1,
         kernel_size=4,
         strides=1,
         padding="valid",
         use_bias=True,
         kernel_regularizer=l2(config.crit_weight_decay),
+        kernel_constraint=SpectralNorm(dim=1),
         dtype="float32",
     )(x)
 

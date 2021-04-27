@@ -20,7 +20,6 @@ from tensorflow.keras.layers import (
     ReLU,
     Reshape,
 )
-from tensorflow.keras.regularizers import l2
 from tensorflow_addons.layers import SpectralNormalization
 
 from ..data import IMG_SHAPE, NUM_CLS
@@ -55,7 +54,6 @@ class Conditioning(Layer):
             NUM_CLS,
             flat_dim,
             input_length=1,
-            embeddings_regularizer=l2(self.config.crit_weight_decay),
         )
         self.embed = SpectralNormalization(
             embed, power_iterations=self.config.power_iter
@@ -94,7 +92,6 @@ def get_generator(config: Config) -> Model:
         NUM_CLS,
         64,
         input_length=1,
-        embeddings_regularizer=l2(config.gen_weight_decay),
     )(labels)
     x = Concatenate(axis=-1)([noise, cond])
     x = Reshape([1, 1, x.shape[-1]])(x)
@@ -109,7 +106,6 @@ def get_generator(config: Config) -> Model:
             padding="valid" if first else "same",
             activation="tanh" if last else None,
             use_bias=True if last else False,
-            kernel_regularizer=l2(config.gen_weight_decay),
             dtype="float32" if last else None,
         )(inputs)
         if not last:
@@ -145,7 +141,6 @@ def get_critic(config: Config) -> Model:
             strides=2,
             padding="same",
             use_bias=False,
-            kernel_regularizer=l2(config.crit_weight_decay),
         )
         conv = SpectralNormalization(conv, power_iterations=config.power_iter)
         x = conv(inputs)
@@ -166,7 +161,6 @@ def get_critic(config: Config) -> Model:
         strides=1,
         padding="valid",
         use_bias=True,
-        kernel_regularizer=l2(config.crit_weight_decay),
         dtype="float32",
     )
     final = SpectralNormalization(final, power_iterations=config.power_iter)

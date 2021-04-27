@@ -11,8 +11,9 @@ from tensorflow import Tensor, Variable
 from tensorflow.data import Dataset
 from tensorflow.keras import Model
 from tensorflow.keras.mixed_precision import LossScaleOptimizer
-from tensorflow.keras.optimizers import Adam, Optimizer
+from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
+from tensorflow_addons.optimizers import AdamW
 from tqdm import tqdm
 
 from ..evaluation import RunningFID
@@ -25,14 +26,10 @@ class _Losses(NamedTuple):
     Attributes:
         wass: The Wasserstein loss
         grad_pen: The Wasserstein gradient penalty
-        gen_reg: The regularization for the generator
-        crit_reg: The regularization for the generator
     """
 
     wass: Tensor
     grad_pen: Tensor
-    gen_reg: Tensor
-    crit_reg: Tensor
 
 
 class GANTrainer:
@@ -97,8 +94,16 @@ class GANTrainer:
                     lr, config.decay_steps, config.decay_rate
                 )
 
-            self.gen_optim = Adam(get_lr_sched(config.gen_lr), 0.5)
-            self.crit_optim = Adam(get_lr_sched(config.crit_lr), 0.5)
+            self.gen_optim = AdamW(
+                get_lr_sched(config.gen_weight_decay),
+                get_lr_sched(config.gen_lr),
+                0.5,
+            )
+            self.crit_optim = AdamW(
+                get_lr_sched(config.crit_weight_decay),
+                get_lr_sched(config.crit_lr),
+                0.5,
+            )
 
         if config.mixed_precision:
             self.gen_optim = LossScaleOptimizer(self.gen_optim)
@@ -152,13 +157,7 @@ class GANTrainer:
         # Wasserstein Gradient Penalty
         grad_pen = self._gradient_penalty(real, generated, labels)
 
-        # Regularization losses
-        # NOTE: Regularization needs to be scaled by the number of GPUs in
-        # the strategy, as gradients will be added.
-        gen_reg = tf.nn.scale_regularization_loss(sum(self.generator.losses))
-        crit_reg = tf.nn.scale_regularization_loss(sum(self.critic.losses))
-
-        return _Losses(wass, grad_pen, gen_reg, crit_reg)
+        return _Losses(wass, grad_pen)
 
     def _gradient_penalty(
         self, real: Tensor, generated: Tensor, labels: Tensor
@@ -219,11 +218,7 @@ class GANTrainer:
             losses = self._get_losses(
                 real, generated, labels, crit_real_out, crit_fake_out
             )
-            crit_loss = (
-                -losses.wass
-                + losses.crit_reg
-                + self.config.gp_weight * losses.grad_pen
-            )
+            crit_loss = -losses.wass + self.config.gp_weight * losses.grad_pen
 
         self._optimize(
             self.critic.trainable_variables,
@@ -264,7 +259,7 @@ class GANTrainer:
             losses = self._get_losses(
                 real, generated, labels, crit_real_out, crit_fake_out
             )
-            gen_loss = losses.wass + losses.gen_reg
+            gen_loss = losses.wass
 
         self._optimize(
             self.generator.trainable_variables,
@@ -312,6 +307,14 @@ class GANTrainer:
 
         return self.evaluator.get_fid()
 
+    @staticmethod
+    def _get_l2_reg(model: Model) -> Tensor:
+        """Get the L2 regularization loss."""
+        loss = 0.0
+        for param in model.trainable_variables:
+            loss += tf.reduce_sum(param**2)
+        return loss
+
     def log_summaries(
         self,
         real: Tensor,
@@ -333,6 +336,9 @@ class GANTrainer:
             losses: The dictionary of losses
             global_step: The current global training step
         """
+        gen_reg = self._get_l2_reg(self.generator)
+        crit_reg = self._get_l2_reg(self.critic)
+
         with self.writer.as_default():
             with tf.name_scope("losses"):
                 tf.summary.scalar(
@@ -343,12 +349,12 @@ class GANTrainer:
                 )
                 tf.summary.scalar(
                     "generator_regularization",
-                    losses.gen_reg,
+                    gen_reg,
                     step=global_step,
                 )
                 tf.summary.scalar(
                     "critic_regularization",
-                    losses.crit_reg,
+                    crit_reg,
                     step=global_step,
                 )
 

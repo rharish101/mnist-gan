@@ -927,6 +927,40 @@ typing-extensions = ">=3.6.6"
 wrapt = ">=1.11.0"
 
 [[package]]
+name = "tensorflow-addons"
+version = "0.17.1"
+description = "TensorFlow Addons."
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "tensorflow_addons-0.17.1-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:51f4679fac03d668777634d4cd30a5fc5d72b2a58af94824a83cd37343ed90e7"},
+    {file = "tensorflow_addons-0.17.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:af8c1b0eade2c12c9007f24d30d75711f3313e500171a7d471c10a336e0dc68b"},
+    {file = "tensorflow_addons-0.17.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e9648b5fb937f19d015946fc6f607de525105ead78afbc7acfe9db3cf4a42ee4"},
+    {file = "tensorflow_addons-0.17.1-cp310-cp310-win_amd64.whl", hash = "sha256:2a652ff30e1bae50c5d740c340705a110ad82d4df2f729a48a7324d710e3a8ac"},
+    {file = "tensorflow_addons-0.17.1-cp37-cp37m-macosx_10_15_x86_64.whl", hash = "sha256:e526633dd5ecb64bc7f2b0b02d056723e7001a01d57f5017ec75baed838b0763"},
+    {file = "tensorflow_addons-0.17.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:42aa05ddd2512395de50ba8c9f6f3694e1afc6f913d040161ad758123aaf9959"},
+    {file = "tensorflow_addons-0.17.1-cp37-cp37m-win_amd64.whl", hash = "sha256:be5dd587ee9a6db5739a6e87fef4cfc1e894987666c6688985f41d1016bb5c11"},
+    {file = "tensorflow_addons-0.17.1-cp38-cp38-macosx_10_15_x86_64.whl", hash = "sha256:4b05a73e1434c53027a5dc9f8448ec1361e3fc998783e86b0286f5acc5a1872d"},
+    {file = "tensorflow_addons-0.17.1-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:17d8ed3ccf4ae47e2f2ac21a4159d2a50e065f374cb7eccd3469c8e4aa03d3c0"},
+    {file = "tensorflow_addons-0.17.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:de49693b488e4c616bf9c942c5af22f165837de85cf930f18fe8196525aa9e97"},
+    {file = "tensorflow_addons-0.17.1-cp38-cp38-win_amd64.whl", hash = "sha256:f884097d6fedb3e7d300d28dc633431303a1dbb7a6d91c442d7aef0b36a5c2c7"},
+    {file = "tensorflow_addons-0.17.1-cp39-cp39-macosx_10_15_x86_64.whl", hash = "sha256:7bb1ba28a94ed58da783e4752ffb7bd9b309bdd7d20c26a0bfaae25c7858e97a"},
+    {file = "tensorflow_addons-0.17.1-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:2265a0bf3728c8f729eef9c9524fa86d3091a6b3f85c0c23d2e26564b58d4dba"},
+    {file = "tensorflow_addons-0.17.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8049e8687e4ff4f1db3022e00b03c655f483e983cb42b3dcc68b2d89c8788302"},
+    {file = "tensorflow_addons-0.17.1-cp39-cp39-win_amd64.whl", hash = "sha256:de36d011e79ff86413265a3656cba23d75b741bd5f6817e43674c731d059e6b8"},
+]
+
+[package.dependencies]
+packaging = "*"
+typeguard = ">=2.7"
+
+[package.extras]
+tensorflow = ["tensorflow (>=2.7.0,<2.10.0)"]
+tensorflow-cpu = ["tensorflow-cpu (>=2.7.0,<2.10.0)"]
+tensorflow-gpu = ["tensorflow-gpu (>=2.7.0,<2.10.0)"]
+
+[[package]]
 name = "tensorflow-estimator"
 version = "2.9.0"
 description = "TensorFlow Estimator."
@@ -1012,6 +1046,22 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 dev = ["py-make (>=0.1.0)", "twine", "wheel"]
 notebook = ["ipywidgets (>=6)"]
 telegram = ["requests"]
+
+[[package]]
+name = "typeguard"
+version = "2.13.3"
+description = "Run-time type checker for Python"
+category = "main"
+optional = false
+python-versions = ">=3.5.3"
+files = [
+    {file = "typeguard-2.13.3-py3-none-any.whl", hash = "sha256:5e3e3be01e887e7eafae5af63d1f36c849aaa94e3a0112097312aabfa16284f1"},
+    {file = "typeguard-2.13.3.tar.gz", hash = "sha256:00edaa8da3a133674796cf5ea87d9f4b4c367d77476e185e80251cc13dfbb8c4"},
+]
+
+[package.extras]
+doc = ["sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme"]
+test = ["mypy", "pytest", "typing-extensions"]
 
 [[package]]
 name = "typing-extensions"
@@ -1178,4 +1228,4 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8,<3.10"
-content-hash = "22ccba62bf9902d48ed5d1e8f8f5096ec5e32c9513391d0f05dc2b5d281b4fee"
+content-hash = "926261eb87989f4cc2d918094bcf69bc3a67e58b3b4b38b61878e42eee7880f7"

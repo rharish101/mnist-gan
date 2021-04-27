@@ -8,7 +8,6 @@ from typing import Tuple, Union
 import tensorflow as tf
 from tensorflow import Tensor, TensorShape
 from tensorflow.keras import Input, Model
-from tensorflow.keras.constraints import Constraint
 from tensorflow.keras.layers import (
     BatchNormalization,
     Concatenate,
@@ -22,51 +21,13 @@ from tensorflow.keras.layers import (
     Reshape,
 )
 from tensorflow.keras.regularizers import l2
+from tensorflow_addons.layers import SpectralNormalization
 
 from ..data import IMG_SHAPE, NUM_CLS
 from ..utils import Config
 
 # The type of an input shape spec for a Keras layer
 Shape = Union[Tuple[int, ...], TensorShape]
-
-
-class SpectralNorm(Constraint):
-    """Constraint the weights to have unit spectral norm.
-
-    Attributes:
-        v: The variable for the power method
-        iterations: The number of iterations of the power method
-    """
-
-    def __init__(self, dim: int, iterations: int = 1):
-        """Initialize the variable for the power method.
-
-        Args:
-            dim: The size of the last dimension of the weights (along which
-                spectral normalization will be applied)
-            iterations: The number of iterations of the power method
-        """
-        self.v = tf.Variable(tf.random.normal((dim, 1)), trainable=False)
-        self.iterations = iterations
-
-    def __call__(self, weights: Tensor) -> Tensor:
-        """Normalize the weights by its spectral norm."""
-        # For Conv kernels, the last layer will be the output channels.
-        # Therefore, (H, W, C_in, C_out) -> (H * W * C_in, C_out)
-        w = tf.reshape(weights, (-1, weights.shape[-1]))
-        v = self.v
-
-        for _ in range(self.iterations):
-            u = tf.linalg.normalize(w @ v)[0]
-            v = tf.linalg.normalize(tf.transpose(w) @ u)[0]
-
-        self.v.assign(tf.cast(v, self.v.dtype))
-        spectral_norm = tf.transpose(u) @ w @ v
-        return weights / spectral_norm
-
-    def get_config(self):
-        """Get the config for this constraint."""
-        return {"dimensions": self.v.shape[0], "iterations": self.iterations}
 
 
 class Conditioning(Layer):
@@ -90,14 +51,14 @@ class Conditioning(Layer):
         """Initialize the Conv2DTranspose and Embedding layers."""
         tensor_shape, _ = input_shape
         flat_dim = tensor_shape[1] * tensor_shape[2] * tensor_shape[3]
-        self.embed = Embedding(
+        embed = Embedding(
             NUM_CLS,
             flat_dim,
             input_length=1,
             embeddings_regularizer=l2(self.config.crit_weight_decay),
-            embeddings_constraint=SpectralNorm(
-                flat_dim, iterations=self.config.power_iter
-            ),
+        )
+        self.embed = SpectralNormalization(
+            embed, power_iterations=self.config.power_iter
         )
 
     def call(self, inputs: Tuple[Tensor, Tensor]) -> Tensor:
@@ -178,15 +139,16 @@ def get_critic(config: Config) -> Model:
     labels = Input(shape=[])
 
     def conv_block(inputs: Tensor, filters: int, norm: bool = True) -> Tensor:
-        x = Conv2D(
+        conv = Conv2D(
             filters,
             kernel_size=4,
             strides=2,
             padding="same",
             use_bias=False,
             kernel_regularizer=l2(config.crit_weight_decay),
-            kernel_constraint=SpectralNorm(filters),
-        )(inputs)
+        )
+        conv = SpectralNormalization(conv, power_iterations=config.power_iter)
+        x = conv(inputs)
         x = Conditioning(config)((x, labels))
         if norm:
             x = LayerNormalization()(x)
@@ -198,15 +160,16 @@ def get_critic(config: Config) -> Model:
     x = conv_block(x, 256)
     x = conv_block(x, 512)
 
-    outputs = Conv2D(
+    final = Conv2D(
         filters=1,
         kernel_size=4,
         strides=1,
         padding="valid",
         use_bias=True,
         kernel_regularizer=l2(config.crit_weight_decay),
-        kernel_constraint=SpectralNorm(dim=1),
         dtype="float32",
-    )(x)
+    )
+    final = SpectralNormalization(final, power_iterations=config.power_iter)
+    outputs = final(x)
 
     return Model(inputs=[inputs, labels], outputs=outputs)

@@ -148,7 +148,7 @@ class GANTrainer:
         crit_real_out: Tensor,
         crit_fake_out: Tensor,
     ) -> _Losses:
-        """Get the dictionary of losses, as required by `log_summaries`."""
+        """Calculate the losses."""
         # Wasserstein distance
         wass = tf.nn.compute_average_loss(
             crit_real_out - crit_fake_out,
@@ -241,7 +241,7 @@ class GANTrainer:
 
         Returns:
             The generated images
-            The dictionary of losses, as required by `log_summaries`
+            The losses object
         """
         noise = tf.random.normal((real.get_shape()[0], self.config.noise_dims))
 
@@ -283,7 +283,7 @@ class GANTrainer:
 
         Returns:
             The generated images
-            The dictionary of losses, as required by `log_summaries`
+            The losses object
         """
         gen, losses = self.strategy.run(self._train_step, args=(real, labels))
 
@@ -324,16 +324,10 @@ class GANTrainer:
     ) -> None:
         """Log summaries to disk.
 
-        The dict of losses should have the following key-value pairs:
-            wass: The Wasserstein loss
-            grad_pen: The Wasserstein gradient penalty
-            gen_reg: The L2 regularization loss for the generator
-            crit_reg: The L2 regularization loss for the critic
-
         Args:
             real: The input real images
             generated: The generated images
-            losses: The dictionary of losses
+            losses: The losses object
             global_step: The current global training step
         """
         gen_reg = self._get_l2_reg(self.generator)

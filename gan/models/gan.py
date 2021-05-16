@@ -15,7 +15,6 @@ from tensorflow.keras.layers import (
     Conv2DTranspose,
     Embedding,
     Layer,
-    LayerNormalization,
     LeakyReLU,
     ReLU,
     Reshape,
@@ -146,7 +145,7 @@ def get_critic(config: Config) -> Model:
         x = conv(inputs)
         x = Conditioning(config)((x, labels))
         if norm:
-            x = LayerNormalization()(x)
+            x = BatchNormalization()(x)
         x = LeakyReLU(alpha=0.2)(x)
         return x
 

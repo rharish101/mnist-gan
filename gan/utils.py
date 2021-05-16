@@ -30,7 +30,6 @@ class Config:
         cls_lr: The learning rate for the classifier's optimizer
         decay_rate: The rate of exponential learning rate decay
         decay_steps: The base steps for exponential learning rate decay
-        gp_weight: Weights for the critic's gradient penalty
         gen_weight_decay: The decay for L2 regularization in the generator
         crit_weight_decay: The decay for L2 regularization in the critic
         cls_weight_decay: The decay for L2 regularization in the classifier
@@ -49,7 +48,6 @@ class Config:
     cls_lr: float = 1e-4
     decay_rate: float = 0.8
     decay_steps: int = 3000
-    gp_weight: float = 10.0
     gen_weight_decay: float = 2.5e-5
     crit_weight_decay: float = 2.5e-5
     cls_weight_decay: float = 2.5e-5

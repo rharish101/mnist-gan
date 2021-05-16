@@ -4,7 +4,7 @@
 
 """Class for training the GAN."""
 from pathlib import Path
-from typing import Final, List, NamedTuple, Tuple
+from typing import Final, List, Tuple
 
 import tensorflow as tf
 from tensorflow import Tensor, Variable
@@ -18,18 +18,6 @@ from tqdm import tqdm
 
 from ..evaluation import RunningFID
 from ..utils import Config, get_grid, reduce_concat
-
-
-class _Losses(NamedTuple):
-    """Holds all the losses for logging.
-
-    Attributes:
-        wass: The Wasserstein loss
-        grad_pen: The Wasserstein gradient penalty
-    """
-
-    wass: Tensor
-    grad_pen: Tensor
 
 
 class GANTrainer:
@@ -140,56 +128,15 @@ class GANTrainer:
 
         self.strategy.run(create_vars, args=tuple())
 
-    def _get_losses(
+    def _get_wass_loss(
         self,
-        real: Tensor,
-        generated: Tensor,
-        labels: Tensor,
         crit_real_out: Tensor,
         crit_fake_out: Tensor,
-    ) -> _Losses:
-        """Calculate the losses."""
-        # Wasserstein distance
-        wass = tf.nn.compute_average_loss(
+    ) -> Tensor:
+        """Calculate the Wasserstein distance."""
+        return tf.nn.compute_average_loss(
             crit_real_out - crit_fake_out,
             global_batch_size=self.config.gan_batch_size,
-        )
-        # Wasserstein Gradient Penalty
-        grad_pen = self._gradient_penalty(real, generated, labels)
-
-        return _Losses(wass, grad_pen)
-
-    def _gradient_penalty(
-        self, real: Tensor, generated: Tensor, labels: Tensor
-    ) -> Tensor:
-        """Return the Wasserstein Gradient Penalty loss.
-
-        The original paper can be found at: https://arxiv.org/abs/1704.00028
-
-        Args:
-            real: The input real images
-            generated: The corresponding generated images
-            labels: The corresponding input labels
-
-        Returns:
-            The gradient penalty loss
-        """
-        with tf.GradientTape() as tape:
-            # U[0, 1] random value used for linear interpolation
-            gp_rand = tf.random.uniform(())
-            gp_inputs = real * gp_rand + generated * (1 - gp_rand)
-
-            # Forces the tape to track the inputs, which is needed for
-            # calculating gradients in the gradient penalty.
-            tape.watch(gp_inputs)
-            crit_gp_out = self.critic([gp_inputs, labels], training=True)
-
-        grads = tape.gradient(crit_gp_out, gp_inputs)
-        flat_grads = tf.reshape(grads, (grads.shape[0], -1))
-        norm = tf.norm(flat_grads, axis=1)
-        gp_batch = (norm - 1) ** 2
-        return tf.nn.compute_average_loss(
-            gp_batch, global_batch_size=self.config.gan_batch_size
         )
 
     def _optimize(
@@ -214,22 +161,18 @@ class GANTrainer:
         with tf.GradientTape() as crit_tape:
             crit_real_out = self.critic([real, labels], training=True)
             crit_fake_out = self.critic([generated, labels], training=True)
-
-            losses = self._get_losses(
-                real, generated, labels, crit_real_out, crit_fake_out
-            )
-            crit_loss = -losses.wass + self.config.gp_weight * losses.grad_pen
+            loss = self._get_wass_loss(crit_real_out, crit_fake_out)
 
         self._optimize(
             self.critic.trainable_variables,
-            crit_loss,
+            -loss,
             self.crit_optim,
             crit_tape,
         )
 
     def _train_step(
         self, real: Tensor, labels: Tensor
-    ) -> Tuple[Tensor, _Losses]:
+    ) -> Tuple[Tensor, Tensor]:
         """Run a single training step on a single GPU.
 
         This training step will train the critic for the required number of
@@ -241,7 +184,7 @@ class GANTrainer:
 
         Returns:
             The generated images
-            The losses object
+            The Wasserstein loss
         """
         noise = tf.random.normal((real.get_shape()[0], self.config.noise_dims))
 
@@ -253,28 +196,24 @@ class GANTrainer:
                 for _ in range(self.config.crit_steps):
                     self._train_step_critic(real, generated, labels)
 
-            crit_real_out = self.critic([real, labels], training=True)
-            crit_fake_out = self.critic([generated, labels], training=True)
-
-            losses = self._get_losses(
-                real, generated, labels, crit_real_out, crit_fake_out
-            )
-            gen_loss = losses.wass
+            crit_real_out = self.critic([real, labels])
+            crit_fake_out = self.critic([generated, labels])
+            loss = self._get_wass_loss(crit_real_out, crit_fake_out)
 
         self._optimize(
             self.generator.trainable_variables,
-            gen_loss,
+            loss,
             self.gen_optim,
             gen_tape,
         )
 
         # Returned values are used for logging summaries
-        return generated, losses
+        return generated, loss
 
     @tf.function
     def train_step(
         self, real: Tensor, labels: Tensor
-    ) -> Tuple[Tensor, _Losses]:
+    ) -> Tuple[Tensor, Tensor]:
         """Run a single training step, distributing across all GPUs.
 
         Args:
@@ -283,18 +222,17 @@ class GANTrainer:
 
         Returns:
             The generated images
-            The losses object
+            The Wasserstein loss
         """
-        gen, losses = self.strategy.run(self._train_step, args=(real, labels))
+        gen, loss = self.strategy.run(self._train_step, args=(real, labels))
 
         gen = reduce_concat(self.strategy, gen)
-        # Sum losses across all GPUs
-        losses = [
-            self.strategy.reduce(tf.distribute.ReduceOp.SUM, value, axis=None)
-            for value in losses
-        ]
+        # Sum loss across all GPUs
+        loss = self.strategy.reduce(
+            tf.distribute.ReduceOp.SUM, loss, axis=None
+        )
 
-        return gen, _Losses(*losses)
+        return gen, loss
 
     def _get_fid(self) -> Tensor:
         """Calculate FID over the validation dataset."""
@@ -319,7 +257,7 @@ class GANTrainer:
         self,
         real: Tensor,
         generated: Tensor,
-        losses: _Losses,
+        loss: Tensor,
         global_step: int,
     ) -> None:
         """Log summaries to disk.
@@ -327,7 +265,7 @@ class GANTrainer:
         Args:
             real: The input real images
             generated: The generated images
-            losses: The losses object
+            loss: The Wasserstein loss
             global_step: The current global training step
         """
         gen_reg = self._get_l2_reg(self.generator)
@@ -335,12 +273,7 @@ class GANTrainer:
 
         with self.writer.as_default():
             with tf.name_scope("losses"):
-                tf.summary.scalar(
-                    "wasserstein_loss", losses.wass, step=global_step
-                )
-                tf.summary.scalar(
-                    "gradient_penalty", losses.grad_pen, step=global_step
-                )
+                tf.summary.scalar("wasserstein_loss", loss, step=global_step)
                 tf.summary.scalar(
                     "generator_regularization",
                     gen_reg,
@@ -412,7 +345,7 @@ class GANTrainer:
             if global_step == 1 and log_graph:
                 tf.summary.trace_on()
 
-            gen, losses = self.train_step(real, lbls)
+            gen, loss = self.train_step(real, lbls)
 
             if global_step == 1 and log_graph:
                 with self.writer.as_default():
@@ -420,10 +353,7 @@ class GANTrainer:
 
             if global_step % record_steps == 0:
                 self.log_summaries(
-                    reduce_concat(self.strategy, real),
-                    gen,
-                    losses,
-                    global_step,
+                    reduce_concat(self.strategy, real), gen, loss, global_step
                 )
 
             if global_step % save_steps == 0:

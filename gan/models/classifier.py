@@ -3,7 +3,13 @@ from typing import Optional
 
 from tensorflow import Tensor
 from tensorflow.keras import Input, Model, Sequential
-from tensorflow.keras.layers import BatchNormalization, Conv2D, Dense, Flatten, ReLU
+from tensorflow.keras.layers import (
+    BatchNormalization,
+    Conv2D,
+    Dense,
+    Flatten,
+    ReLU,
+)
 from tensorflow.keras.regularizers import l2
 
 from ..data import IMG_SHAPE, NUM_CLS

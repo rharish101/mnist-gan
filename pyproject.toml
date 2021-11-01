@@ -6,7 +6,7 @@ authors = ["Harish Rajagopal <harish.rajagopals@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = "^3.8"
 tensorflow = "^2.5.1"
 tqdm = "^4.55.1"
 toml = "^0.10.2"

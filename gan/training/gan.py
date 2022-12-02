@@ -5,7 +5,6 @@ from typing import Final, List, NamedTuple, Tuple
 import tensorflow as tf
 from tensorflow import Tensor, Variable
 from tensorflow.data import Dataset
-from tensorflow.distribute import ReduceOp, Strategy
 from tensorflow.keras import Model
 from tensorflow.keras.mixed_precision import LossScaleOptimizer
 from tensorflow.keras.optimizers import Adam, Optimizer
@@ -58,7 +57,7 @@ class GANTrainer:
         generator: Model,
         critic: Model,
         classifier: Model,
-        strategy: Strategy,
+        strategy: tf.distribute.Strategy,
         train_dataset: Dataset,
         val_dataset: Dataset,
         config: Config,
@@ -292,7 +291,7 @@ class GANTrainer:
         gen = reduce_concat(self.strategy, gen)
         # Sum losses across all GPUs
         losses = [
-            self.strategy.reduce(ReduceOp.SUM, value, axis=None)
+            self.strategy.reduce(tf.distribute.ReduceOp.SUM, value, axis=None)
             for value in losses
         ]
 

@@ -8,7 +8,6 @@ from typing import List, Optional, Union
 import tensorflow as tf
 import toml
 from tensorflow import Tensor
-from tensorflow.distribute import Strategy
 from tensorflow.python.distribute.values import PerReplica
 
 DistTensor = Union[PerReplica, Tensor]
@@ -171,7 +170,9 @@ def setup_dirs(
     return tstamped_dirs
 
 
-def reduce_concat(strategy: Strategy, dist_tensor: DistTensor) -> Tensor:
+def reduce_concat(
+    strategy: tf.distribute.Strategy, dist_tensor: DistTensor
+) -> Tensor:
     """Reduce a distributed tensor by batch-axis concatenation.
 
     Args:

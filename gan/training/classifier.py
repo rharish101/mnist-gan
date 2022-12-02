@@ -2,8 +2,8 @@
 from pathlib import Path
 from typing import Final
 
+import tensorflow as tf
 from tensorflow.data import Dataset
-from tensorflow.distribute import Strategy
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
@@ -22,7 +22,9 @@ class ClassifierTrainer:
 
     CLS_PATH: Final = "classifier.ckpt"
 
-    def __init__(self, model: Model, strategy: Strategy, config: Config):
+    def __init__(
+        self, model: Model, strategy: tf.distribute.Strategy, config: Config
+    ):
         """Store the main model and other required info.
 
         Args:

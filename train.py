@@ -4,7 +4,7 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from pathlib import Path
 from typing import Final
 
-from tensorflow.distribute import MirroredStrategy
+import tensorflow as tf
 from tensorflow.keras.mixed_precision import set_global_policy
 
 from gan.data import get_dataset
@@ -23,7 +23,7 @@ def main(args: Namespace) -> None:
     """
     config = load_config(args.config)
 
-    strategy = MirroredStrategy()
+    strategy = tf.distribute.MirroredStrategy()
     if config.mixed_precision:
         set_global_policy("mixed_float16")
 

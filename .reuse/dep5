@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: MNIST GAN
+Upstream-Contact: Harish Rajagopal <harish.rajagopals@gmail.com>
+Source: https://github.com/rharish101/mnist-gan
+
+Files: images/*
+Copyright: 2020 Harish Rajagopal <harish.rajagopals@gmail.com>
+License: CC-BY-4.0
+
+Files: poetry.lock
+Copyright: 2020 Harish Rajagopal <harish.rajagopals@gmail.com>
+License: CC0-1.0

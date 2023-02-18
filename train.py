@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2019 Harish Rajagopal <harish.rajagopals@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+
 """Train a GAN."""
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from pathlib import Path

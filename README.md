@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 Harish Rajagopal <harish.rajagopals@gmail.com>
+
+SPDX-License-Identifier: MIT
+-->
+
 # MNIST GAN
 
 This is a repository for training a [conditional GAN](https://arxiv.org/abs/1411.1784) for the [MNIST dataset](yann.lecun.com/exdb/mnist/).
@@ -145,3 +151,10 @@ Here, `{class_num}` is the index of the image's class, and `{instance_num}` sign
     <br>
     <img src="images/0-3.jpg" alt="sample 0"> <img src="images/1-3.jpg" alt="sample 1"> <img src="images/2-3.jpg" alt="sample 2"> <img src="images/3-3.jpg" alt="sample 3"> <img src="images/4-3.jpg" alt="sample 4"> <img src="images/5-3.jpg" alt="sample 5"> <img src="images/6-3.jpg" alt="sample 6"> <img src="images/7-3.jpg" alt="sample 7"> <img src="images/8-3.jpg" alt="sample 8"> <img src="images/9-3.jpg" alt="sample 9">
 </p>
+
+## Licenses
+This repository uses [REUSE](https://reuse.software/) to document licenses.
+Each file either has a header containing copyright and license information, or has an entry in the [DEP5 file](https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/) at [.reuse/dep5](./.reuse/dep5).
+The license files that are used in this project can be found in the [LICENSES](./LICENSES) directory.
+
+The MIT license is placed in [LICENSE](./LICENSE), to signify that it constitutes the majority of the codebase, and for compatibility with GitHub.

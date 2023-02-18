@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Harish Rajagopal <harish.rajagopals@gmail.com>
+#
+# SPDX-License-Identifier: CC0-1.0
+
 repos:
   - repo: https://github.com/psf/black
     rev: 22.12.0
@@ -14,5 +18,9 @@ repos:
       - id: mypy
         additional_dependencies:
           - types-toml
+  - repo: https://github.com/fsfe/reuse-tool
+    rev: v1.1.2
+    hooks:
+      - id: reuse
 ci:
   autoupdate_schedule: quarterly

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 Harish Rajagopal <harish.rajagopals@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+
 """Class for training the GAN."""
 from pathlib import Path
 from typing import Final, List, NamedTuple, Tuple

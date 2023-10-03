@@ -4,22 +4,22 @@
 
 repos:
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 23.9.1
     hooks:
       - id: black
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.276
+    rev: v0.0.292
     hooks:
       - id: ruff
         args: [--fix]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.4.1
+    rev: v1.5.1
     hooks:
       - id: mypy
         additional_dependencies:
           - types-toml
   - repo: https://github.com/fsfe/reuse-tool
-    rev: v2.0.0
+    rev: v2.1.0
     hooks:
       - id: reuse
 ci:
